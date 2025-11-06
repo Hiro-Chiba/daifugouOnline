@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { PrismaClient } from '@prisma/client';
 import { getPrismaClient } from '@/lib/db';
+import { cleanupStaleRooms } from '@/lib/cleanup';
 import { pusherServer } from '@/lib/pusher-server';
 import { startGameIfReady, syncForClient } from '@/lib/game/engine';
 import { MAX_PLAYERS } from '@/lib/game/constants';
@@ -24,6 +25,7 @@ const findOrCreateMatch = async (prisma: PrismaClient, roomId: string) => {
 
 export async function POST(request: Request) {
   const prisma = getPrismaClient();
+  await cleanupStaleRooms(prisma);
   const body = (await request.json()) as JoinRequestBody;
   if (!body.code || !body.name) {
     return NextResponse.json({ error: 'コードと名前は必須です' }, { status: 400 });

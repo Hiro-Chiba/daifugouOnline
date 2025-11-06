@@ -20,6 +20,7 @@ model Room {
   isOpen    Boolean  @default(true)
   stateJson String   @default("{}")
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
   matches   Match[]
 
   @@index([code], map: "room_code_idx")

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getPrismaClient } from '@/lib/db';
+import { cleanupStaleRooms } from '@/lib/cleanup';
 import { parseState, serializeState } from '@/lib/game/state';
 import { pusherServer } from '@/lib/pusher-server';
 import { startGameIfReady, syncForClient } from '@/lib/game/engine';
@@ -12,6 +13,7 @@ interface StartRequestBody {
 
 export async function POST(request: Request) {
   const prisma = getPrismaClient();
+  await cleanupStaleRooms(prisma);
   const body = (await request.json()) as StartRequestBody;
 
   if (!body.code || !body.userId) {
