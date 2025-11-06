@@ -6,13 +6,21 @@ import GameBoard from '@/components/GameBoard';
 import Toast from '@/components/Toast';
 import { getPusherClient } from '@/lib/pusher-client';
 import type { Card, PublicState } from '@/lib/game/types';
-import { loadSession, saveSession } from '@/lib/session';
+import { clearSession, loadSession, saveSession } from '@/lib/session';
 
 interface SyncResponse {
   state: PublicState;
 }
 
 interface PlayResponse {
+  state: PublicState;
+}
+
+interface StartResponse {
+  state: PublicState;
+}
+
+interface LeaveResponse {
   state: PublicState;
 }
 
@@ -45,6 +53,8 @@ const RoomPage = () => {
   const [selected, setSelected] = useState<string[]>([]);
   const [messages, setMessages] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
+  const [startLoading, setStartLoading] = useState(false);
+  const [leaveLoading, setLeaveLoading] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<'connected' | 'reconnecting'>('connected');
 
   const roomCode = useMemo(() => (typeof params.code === 'string' ? params.code : params.code?.[0] ?? ''), [params.code]);
@@ -227,15 +237,92 @@ const RoomPage = () => {
     }
   }, [roomCode, session, updateState, pushMessage]);
 
+  const handleStartGame = useCallback(async () => {
+    if (!session) {
+      return;
+    }
+    try {
+      setStartLoading(true);
+      const response = await fetch('/api/rooms/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: roomCode, userId: session.userId })
+      });
+      const data = (await response.json()) as StartResponse & { error?: string };
+      if (!response.ok) {
+        pushMessage(data.error ?? 'ゲーム開始に失敗しました');
+        return;
+      }
+      const selfPlayer = data.state.players.find((player) => player.id === session.userId);
+      const nextHand = (selfPlayer?.hand ?? []) as Card[];
+      setHand(nextHand);
+      setSelected([]);
+      updateState(data.state, nextHand);
+      saveSession({ ...session, roomCode });
+    } catch (error) {
+      pushMessage('通信エラーが発生しました');
+    } finally {
+      setStartLoading(false);
+    }
+  }, [roomCode, session, updateState, pushMessage]);
+
+  const handleLeaveRoom = useCallback(async () => {
+    if (!session) {
+      return;
+    }
+    try {
+      setLeaveLoading(true);
+      const response = await fetch('/api/rooms/leave', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: roomCode, userId: session.userId })
+      });
+      const data = (await response.json()) as LeaveResponse & { error?: string };
+      if (!response.ok) {
+        pushMessage(data.error ?? '退室に失敗しました');
+        return;
+      }
+      clearSession();
+      setSession(null);
+      pushMessage('ルームを退出しました');
+      router.replace('/');
+    } catch (error) {
+      pushMessage('通信エラーが発生しました');
+    } finally {
+      setLeaveLoading(false);
+    }
+  }, [roomCode, session, pushMessage, router]);
+
   if (!session) {
     return null;
   }
+
+  const playersCount = state?.players.length ?? 0;
+  const hasGameStarted = state?.players.some((player) => player.handCount > 0) ?? false;
+  const canStartGame = !hasGameStarted && playersCount >= 4;
+  const remainingPlayers = Math.max(0, 4 - playersCount);
 
   return (
     <div className="flex-column">
       <header className="form-card" style={{ marginBottom: 16 }}>
         <h2>ルームコード: {roomCode}</h2>
         <p>プレイヤー名: {session.name}</p>
+        <div
+          className="flex-column"
+          style={{ flexDirection: 'row', gap: 12, flexWrap: 'wrap', marginTop: 12 }}
+        >
+          <button type="button" onClick={handleStartGame} disabled={!canStartGame || startLoading}>
+            {startLoading ? '開始中…' : 'ゲーム開始'}
+          </button>
+          <button type="button" onClick={handleLeaveRoom} disabled={leaveLoading}>
+            {leaveLoading ? '退室中…' : 'ルームを退出'}
+          </button>
+        </div>
+        {!hasGameStarted && playersCount < 4 ? (
+          <small style={{ display: 'block', marginTop: 8 }}>
+            ゲーム開始にはあと{remainingPlayers}人必要です
+          </small>
+        ) : null}
       </header>
       <GameBoard
         state={state}

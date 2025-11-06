@@ -27,3 +27,10 @@ export const saveSession = (session: StoredSession) => {
   }
   window.localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
 };
+
+export const clearSession = () => {
+  if (typeof window === 'undefined') {
+    return;
+  }
+  window.localStorage.removeItem(SESSION_STORAGE_KEY);
+};
