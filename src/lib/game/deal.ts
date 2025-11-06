@@ -73,11 +73,15 @@ export const dealCards = (playerIds: PlayerId[]): DealResult => {
     hands[playerId].push(card);
   });
 
+  playerIds.forEach((playerId) => {
+    hands[playerId] = sortCardsByStrength(hands[playerId]);
+  });
+
   const starter = findStarter(hands);
   return { hands, starter };
 };
 
-const compareCard = (a: Card, b: Card): number => {
+export const compareCard = (a: Card, b: Card): number => {
   if (a.rank === 'Joker') {
     return 1;
   }
@@ -93,6 +97,9 @@ const compareCard = (a: Card, b: Card): number => {
   }
   return suitOrder[a.suit] - suitOrder[b.suit];
 };
+
+export const sortCardsByStrength = (cards: Card[]): Card[] =>
+  [...cards].sort((a, b) => compareCard(b, a));
 
 const findStarter = (hands: Record<PlayerId, Card[]>): PlayerId | null => {
   let starter: PlayerId | null = null;
