@@ -24,7 +24,7 @@ const JoinForm = ({ mode, onSubmit }: JoinFormProps) => {
   const [name, setName] = useState('');
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
-  const [expanded, setExpanded] = useState(true);
+  const [expanded, setExpanded] = useState(false);
 
   const formId = useMemo(() => `${mode}-form`, [mode]);
 
