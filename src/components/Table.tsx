@@ -1,10 +1,17 @@
 'use client';
 
 import Image from 'next/image';
-import type { Card, PublicState } from '@/lib/game/types';
+import type { Card, PublicState, Suit } from '@/lib/game/types';
 import { getCardImagePath, getCardLabel } from '@/lib/game/cardAssets';
 
 const describeCards = (cards: Card[]): string => cards.map(getCardLabel).join(' ');
+
+const suitIconMap: Record<Suit, string> = {
+  clubs: '♣',
+  diamonds: '♦',
+  hearts: '♥',
+  spades: '♠'
+};
 
 interface TableProps {
   state: PublicState | null;
@@ -39,6 +46,10 @@ const Table = ({ state }: TableProps) => {
       <p>
         強さ順: {state?.flags.strengthReversed ? '逆転中' : '通常'} / 順番:{' '}
         {state?.flags.rotationReversed ? '逆回り' : '通常'}
+      </p>
+      <p>
+        縛り:{' '}
+        {state?.flags.lockSuit ? `${suitIconMap[state.flags.lockSuit]}縛り` : 'なし'}
       </p>
       {state?.flags.awaitingSpade3 ? <p>ジョーカー待ち：♠3のみ返せます</p> : null}
       {state?.pendingEffects.length ? (

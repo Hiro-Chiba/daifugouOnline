@@ -1,4 +1,4 @@
-import type { Card, GameState, PlayerId, Rank, ValidationResult } from './types';
+import type { Card, GameState, PlayerId, Rank, Suit, ValidationResult } from './types';
 
 const baseOrder: Rank[] = ['3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A', '2'];
 
@@ -15,12 +15,15 @@ const getRankValue = (rank: Rank, reversed: boolean): number => {
 const isSingleSpadeThree = (cards: Card[]): boolean =>
   cards.length === 1 && cards[0].rank === '3' && cards[0].suit === 'spades';
 
-const hasSameRank = (cards: Card[]): boolean => {
-  if (cards.length <= 1) {
+const getNonJokerCards = (cards: Card[]): Card[] => cards.filter((card) => card.rank !== 'Joker');
+
+const hasUniformRank = (cards: Card[]): boolean => {
+  const nonJokers = getNonJokerCards(cards);
+  if (nonJokers.length <= 1) {
     return true;
   }
-  const first = cards[0].rank;
-  return cards.every((card) => card.rank === first);
+  const first = nonJokers[0].rank;
+  return nonJokers.every((card) => card.rank === first);
 };
 
 const containsJoker = (cards: Card[]): boolean => cards.some((card) => card.rank === 'Joker');
@@ -32,13 +35,40 @@ const playerHasCards = (hand: Card[], cards: Card[]): boolean => {
   return cards.every((card) => handIds.includes(card.id));
 };
 
+const extractSuits = (cards: Card[]): Suit[] =>
+  cards.filter((card) => card.suit !== 'joker').map((card) => card.suit as Suit);
+
+const describeSuit = (suit: Suit): string => {
+  const map: Record<Suit, string> = {
+    clubs: '♣',
+    diamonds: '♦',
+    hearts: '♥',
+    spades: '♠'
+  };
+  return map[suit];
+};
+
+const getCombinationRank = (cards: Card[]): Rank => {
+  if (cards.length === 0) {
+    return '3';
+  }
+  if (cards.length === 1) {
+    return cards[0].rank;
+  }
+  const nonJokers = getNonJokerCards(cards);
+  if (nonJokers.length === 0) {
+    return 'Joker';
+  }
+  return nonJokers[0].rank;
+};
+
 const compareCombination = (
   challenger: Card[],
   current: Card[],
   reversed: boolean
 ): number => {
-  const challengerStrength = Math.max(...challenger.map((card) => getRankValue(card.rank, reversed)));
-  const currentStrength = Math.max(...current.map((card) => getRankValue(card.rank, reversed)));
+  const challengerStrength = getRankValue(getCombinationRank(challenger), reversed);
+  const currentStrength = getRankValue(getCombinationRank(current), reversed);
   return challengerStrength - currentStrength;
 };
 
@@ -62,11 +92,28 @@ export const canPlay = (state: GameState, userId: PlayerId, cards: Card[]): Vali
   if (!playerHasCards(player.hand, cards)) {
     return { ok: false, reason: '手札に存在しないカードです' };
   }
-  if (!hasSameRank(cards) && !(cards.length === 1 && containsJoker(cards))) {
+  if (!hasUniformRank(cards)) {
     return { ok: false, reason: '同じランクのカードのみ出せます' };
   }
   if (state.table.requiredCount !== null && state.table.requiredCount !== cards.length) {
     return { ok: false, reason: `今回は${state.table.requiredCount}枚で出してください` };
+  }
+
+  if (state.flags.lockSuit) {
+    const suits = extractSuits(cards);
+    if (suits.length === 0) {
+      if (!containsJoker(cards)) {
+        return {
+          ok: false,
+          reason: `${describeSuit(state.flags.lockSuit)}のカードのみ出せます`
+        };
+      }
+    } else if (!suits.every((suit) => suit === state.flags.lockSuit)) {
+      return {
+        ok: false,
+        reason: `${describeSuit(state.flags.lockSuit)}のカードのみ出せます`
+      };
+    }
   }
 
   if (state.flags.awaitingSpade3) {
@@ -88,7 +135,7 @@ export const canPlay = (state: GameState, userId: PlayerId, cards: Card[]): Vali
     return { ok: false, reason: 'ジョーカーを超えるカードが必要です' };
   }
 
-  if (includesRank(lastPlay.cards, 'J') && !hasSameRank(cards)) {
+  if (includesRank(lastPlay.cards, 'J') && !hasUniformRank(cards)) {
     return { ok: false, reason: '枚数縛りを守ってください' };
   }
 
