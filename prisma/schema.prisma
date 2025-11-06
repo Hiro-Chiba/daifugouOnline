@@ -1,0 +1,48 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String         @id @default(cuid())
+  name      String
+  createdAt DateTime       @default(now())
+  players   MatchPlayer[]
+}
+
+model Room {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  isOpen    Boolean  @default(true)
+  stateJson String   @default("{}")
+  createdAt DateTime @default(now())
+  matches   Match[]
+
+  @@index([code], map: "room_code_idx")
+}
+
+model Match {
+  id        String        @id @default(cuid())
+  roomId    String
+  room      Room          @relation(fields: [roomId], references: [id])
+  createdAt DateTime      @default(now())
+  finished  Boolean       @default(false)
+  turns     Int           @default(0)
+  players   MatchPlayer[]
+}
+
+model MatchPlayer {
+  id        String  @id @default(cuid())
+  matchId   String
+  match     Match   @relation(fields: [matchId], references: [id])
+  userId    String
+  user      User    @relation(fields: [userId], references: [id])
+  seat      Int
+  result    String?
+
+  @@unique([matchId, userId], map: "match_player_unique")
+}
