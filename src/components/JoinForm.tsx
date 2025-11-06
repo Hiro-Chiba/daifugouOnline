@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 
 interface JoinFormProps {
   mode: 'create' | 'join';
@@ -24,6 +24,13 @@ const JoinForm = ({ mode, onSubmit }: JoinFormProps) => {
   const [name, setName] = useState('');
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
+  const [expanded, setExpanded] = useState(true);
+
+  const formId = useMemo(() => `${mode}-form`, [mode]);
+
+  const toggleExpanded = () => {
+    setExpanded((prev) => !prev);
+  };
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -44,37 +51,52 @@ const JoinForm = ({ mode, onSubmit }: JoinFormProps) => {
   };
 
   return (
-    <form className="form-card flex-column" onSubmit={handleSubmit}>
-      <div>
-        <h2>{labels[mode].title}</h2>
-        <p>{labels[mode].description}</p>
-      </div>
-      <div className="flex-column">
-        <label>
-          <span>表示名</span>
-          <input
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-            placeholder="例: たろう"
-            maxLength={16}
-          />
-        </label>
-        {mode === 'join' ? (
-          <label>
-            <span>ルームコード</span>
-            <input
-              value={code}
-              onChange={(event) => setCode(event.target.value.toUpperCase())}
-              placeholder="000000"
-              maxLength={6}
-            />
-          </label>
-        ) : null}
-      </div>
-      <button type="submit" disabled={loading}>
-        {loading ? '処理中…' : labels[mode].button}
-      </button>
-    </form>
+    <section className={`form-card join-card ${expanded ? 'expanded' : 'collapsed'}`}>
+      <header className="join-card-header">
+        <div>
+          <h2>{labels[mode].title}</h2>
+          <p>{labels[mode].description}</p>
+        </div>
+        <button
+          type="button"
+          className="toggle-button"
+          onClick={toggleExpanded}
+          aria-expanded={expanded}
+          aria-controls={formId}
+        >
+          {expanded ? 'たたむ' : '開く'}
+        </button>
+      </header>
+      {expanded ? (
+        <form id={formId} className="flex-column" onSubmit={handleSubmit}>
+          <div className="flex-column">
+            <label>
+              <span>表示名</span>
+              <input
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                placeholder="例: たろう"
+                maxLength={16}
+              />
+            </label>
+            {mode === 'join' ? (
+              <label>
+                <span>ルームコード</span>
+                <input
+                  value={code}
+                  onChange={(event) => setCode(event.target.value.toUpperCase())}
+                  placeholder="000000"
+                  maxLength={6}
+                />
+              </label>
+            ) : null}
+          </div>
+          <button type="submit" disabled={loading}>
+            {loading ? '処理中…' : labels[mode].button}
+          </button>
+        </form>
+      ) : null}
+    </section>
   );
 };
 
