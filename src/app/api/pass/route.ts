@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/db';
+import { getPrismaClient } from '@/lib/db';
 import { pusherServer } from '@/lib/pusher-server';
 import { applyPass, syncForClient } from '@/lib/game/engine';
 import { parseState, serializeState } from '@/lib/game/state';
@@ -10,6 +10,7 @@ interface PassRequestBody {
 }
 
 export async function POST(request: Request) {
+  const prisma = getPrismaClient();
   const body = (await request.json()) as PassRequestBody;
   if (!body.code || !body.userId) {
     return NextResponse.json({ error: '必要な情報が不足しています' }, { status: 400 });

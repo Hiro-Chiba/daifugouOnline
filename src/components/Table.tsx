@@ -1,3 +1,5 @@
+'use client';
+
 import type { Card, PublicState } from '@/lib/game/types';
 
 const suitIcon: Record<string, string> = {

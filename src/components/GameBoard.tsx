@@ -1,3 +1,5 @@
+'use client';
+
 import PlayerList from './PlayerList';
 import Table from './Table';
 import Hand from './Hand';
