@@ -356,6 +356,22 @@ export const startGameIfReady = (state: GameState): GameState => {
   const ordered = [...state.players].sort((a, b) => a.seat - b.seat);
   const playerIds = ordered.map((player) => player.id);
   const { hands, starter } = dealCards(playerIds);
+  state.flags = {
+    strengthReversed: false,
+    rotationReversed: false,
+    lockSuit: null,
+    awaitingSpade3: false
+  };
+  state.table = {
+    lastPlay: null,
+    requiredCount: null,
+    pile: [],
+    logs: []
+  };
+  state.pendingEffects = [];
+  state.turnHistory = [];
+  state.passStreak = 0;
+  state.finished = false;
   state.players = state.players.map((player) => ({
     ...player,
     hand: hands[player.id] ?? [],
@@ -366,5 +382,48 @@ export const startGameIfReady = (state: GameState): GameState => {
   state.currentTurn = starter ?? playerIds[0] ?? null;
   state.startingPlayer = state.currentTurn;
   appendLog(state, 'カードが配られました。最も小さいカードを持つプレイヤーから開始します');
+  return state;
+};
+
+export const removePlayer = (
+  state: GameState,
+  playerId: PlayerId,
+  options?: { resultLabel?: string }
+): GameState => {
+  const index = state.players.findIndex((player) => player.id === playerId);
+  if (index === -1) {
+    return state;
+  }
+
+  const leavingPlayer = state.players[index];
+  const hasDealt = state.players.some((player) => player.hand.length > 0);
+
+  appendLog(state, `${leavingPlayer.name} さんが退室しました`);
+
+  if (!hasDealt) {
+    state.players.splice(index, 1);
+    if (state.currentTurn === playerId) {
+      const ordered = [...state.players].sort((a, b) => a.seat - b.seat);
+      state.currentTurn = ordered[0]?.id ?? null;
+      state.startingPlayer = state.currentTurn;
+    }
+    return state;
+  }
+
+  state.players[index] = {
+    ...leavingPlayer,
+    connected: false,
+    finished: true,
+    result: options?.resultLabel ?? leavingPlayer.result ?? '退室',
+    hand: [],
+    hasPassed: true
+  };
+
+  if (state.currentTurn === playerId) {
+    state.currentTurn = calculateNextPlayer(state, playerId, false);
+  }
+
+  checkForMatchEnd(state);
+
   return state;
 };
