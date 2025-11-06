@@ -57,6 +57,7 @@ const RoomPage = () => {
   const [startLoading, setStartLoading] = useState(false);
   const [leaveLoading, setLeaveLoading] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<'connected' | 'reconnecting'>('connected');
+  const [isInfoCollapsed, setIsInfoCollapsed] = useState(true);
 
   const roomCode = useMemo(() => (typeof params.code === 'string' ? params.code : params.code?.[0] ?? ''), [params.code]);
 
@@ -305,33 +306,39 @@ const RoomPage = () => {
   const isRoomFull = playersCount >= MAX_PLAYERS;
 
   return (
-    <div className="flex-column">
-      <header className="form-card" style={{ marginBottom: 16 }}>
-        <h2>ルームコード: {roomCode}</h2>
-        <p>プレイヤー名: {session.name}</p>
-        <div
-          className="flex-column"
-          style={{ flexDirection: 'row', gap: 12, flexWrap: 'wrap', marginTop: 12 }}
+    <div className="room-page">
+      <section className={`room-info ${isInfoCollapsed ? 'room-info-collapsed' : ''}`}>
+        <button
+          type="button"
+          className="room-info-toggle"
+          onClick={() => setIsInfoCollapsed((prev) => !prev)}
+          aria-expanded={!isInfoCollapsed}
         >
-          <button type="button" onClick={handleStartGame} disabled={!canStartGame || startLoading}>
-            {startLoading ? '開始中…' : 'ゲーム開始'}
-          </button>
-          <button type="button" onClick={handleLeaveRoom} disabled={leaveLoading}>
-            {leaveLoading ? '退室中…' : 'ルームを退出'}
-          </button>
+          <span className="room-info-label">ルーム情報</span>
+          <span className="room-info-code">#{roomCode}</span>
+          <span className="room-info-icon" aria-hidden="true">
+            {isInfoCollapsed ? '＋' : '－'}
+          </span>
+        </button>
+        <div className="room-info-body">
+          <p>プレイヤー名: {session.name}</p>
+          <div className="room-info-actions">
+            <button type="button" onClick={handleStartGame} disabled={!canStartGame || startLoading}>
+              {startLoading ? '開始中…' : 'ゲーム開始'}
+            </button>
+            <button type="button" onClick={handleLeaveRoom} disabled={leaveLoading}>
+              {leaveLoading ? '退室中…' : 'ルームを退出'}
+            </button>
+          </div>
+          {!hasGameStarted ? (
+            playersCount < MIN_PLAYERS ? (
+              <small className="room-info-hint">ゲーム開始にはあと{remainingPlayers}人必要です</small>
+            ) : isRoomFull ? (
+              <small className="room-info-hint">ルームは満員です（最大{MAX_PLAYERS}人まで参加できます）</small>
+            ) : null
+          ) : null}
         </div>
-        {!hasGameStarted ? (
-          playersCount < MIN_PLAYERS ? (
-            <small style={{ display: 'block', marginTop: 8 }}>
-              ゲーム開始にはあと{remainingPlayers}人必要です
-            </small>
-          ) : isRoomFull ? (
-            <small style={{ display: 'block', marginTop: 8 }}>
-              ルームは満員です（最大{MAX_PLAYERS}人まで参加できます）
-            </small>
-          ) : null
-        ) : null}
-      </header>
+      </section>
       <GameBoard
         state={state}
         selfPlayerId={session.userId}
