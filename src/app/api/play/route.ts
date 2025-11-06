@@ -28,14 +28,14 @@ const persistResultsIfFinished = async (prisma: PrismaClient, state: GameState) 
     where: { id: state.matchId },
     data: { finished: true }
   });
-  await Promise.all(
-    state.players.map((player) =>
-      prisma.matchPlayer.updateMany({
+  for (const player of state.players) {
+    if (player.id) {
+      await prisma.matchPlayer.updateMany({
         where: { matchId: state.matchId, userId: player.id },
-        data: { result: player.result ?? null }
-      })
-    )
-  );
+        data: { result: player.result ?? null },
+      });
+    }
+  }
   await prisma.room.update({
     where: { code: state.roomCode },
     data: { isOpen: false }

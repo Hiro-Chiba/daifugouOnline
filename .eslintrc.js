@@ -1,11 +1,8 @@
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-
 /** @type {import('eslint').Linter.Config} */
 const config = {
   root: true,
+  parser: '@typescript-eslint/parser',
+  plugins: ['@typescript-eslint'],
   parserOptions: {
     tsconfigRootDir: __dirname,
     project: ['./tsconfig.json']
@@ -16,4 +13,4 @@ const config = {
   }
 };
 
-export default config;
+module.exports = config;
