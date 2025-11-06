@@ -2,7 +2,7 @@ import { fisherYatesShuffle } from './shuffles';
 import type { Card, PlayerId, Rank, Suit } from './types';
 
 const suits: Suit[] = ['clubs', 'diamonds', 'hearts', 'spades'];
-const ranks: Rank[] = ['3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A', '2'];
+const ranks: Exclude<Rank, 'Joker'>[] = ['3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A', '2'];
 
 const suitOrder: Record<Suit, number> = {
   clubs: 0,
