@@ -1,5 +1,6 @@
 import { format } from 'date-fns';
 import { dealCards } from './deal';
+import { MIN_PLAYERS } from './constants';
 import { canPlay } from './validators';
 import type { Card, GamePlayer, GameState, PlayerId, Play, PublicState, ValidationResult } from './types';
 
@@ -346,7 +347,7 @@ export const syncForClient = (state: GameState, viewerId: PlayerId): PublicState
 });
 
 export const startGameIfReady = (state: GameState): GameState => {
-  if (state.players.length < 4) {
+  if (state.players.length < MIN_PLAYERS) {
     return state;
   }
   const alreadyDealt = state.players.some((player) => player.hand.length > 0);
