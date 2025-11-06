@@ -66,10 +66,9 @@ const HomePage = () => {
   );
 
   return (
-    <div className="flex-column">
-      <section className="form-card">
+    <div className="landing-container">
+      <section className="form-card landing-hero">
         <h1>大富豪オンライン</h1>
-        <p>友だちとリアルタイムで大富豪を楽しもう。Pusher と Prisma が同期を支えます。</p>
       </section>
       <JoinForm mode="create" onSubmit={handleCreate} />
       <JoinForm mode="join" onSubmit={handleJoin} />
