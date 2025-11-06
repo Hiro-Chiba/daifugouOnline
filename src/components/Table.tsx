@@ -34,6 +34,11 @@ const Table = ({ state }: TableProps) => {
         強さ順: {state?.flags.strengthReversed ? '逆転中' : '通常'} / 順番:{' '}
         {state?.flags.rotationReversed ? '逆回り' : '通常'}
       </p>
+      {state?.flags.lockSuits?.length ? (
+        <p>
+          現在の縛り: {state.flags.lockSuits.map((suit) => suitIcon[suit] ?? '').join('・')}
+        </p>
+      ) : null}
       {state?.flags.awaitingSpade3 ? <p>ジョーカー待ち：♠3のみ返せます</p> : null}
       {state?.pendingEffects.length ? (
         <div>
