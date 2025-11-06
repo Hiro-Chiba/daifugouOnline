@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/db';
+import type { PrismaClient } from '@prisma/client';
+import { getPrismaClient } from '@/lib/db';
 import { pusherServer } from '@/lib/pusher-server';
 import { startGameIfReady, syncForClient } from '@/lib/game/engine';
 import { parseState, serializeState } from '@/lib/game/state';
@@ -9,7 +10,7 @@ interface JoinRequestBody {
   name?: string;
 }
 
-const findOrCreateMatch = async (roomId: string) => {
+const findOrCreateMatch = async (prisma: PrismaClient, roomId: string) => {
   const existing = await prisma.match.findFirst({
     where: { roomId, finished: false },
     orderBy: { createdAt: 'desc' }
@@ -21,6 +22,7 @@ const findOrCreateMatch = async (roomId: string) => {
 };
 
 export async function POST(request: Request) {
+  const prisma = getPrismaClient();
   const body = (await request.json()) as JoinRequestBody;
   if (!body.code || !body.name) {
     return NextResponse.json({ error: 'コードと名前は必須です' }, { status: 400 });
@@ -31,7 +33,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'ルームが見つかりません' }, { status: 404 });
   }
 
-  const match = await findOrCreateMatch(room.id);
+  const match = await findOrCreateMatch(prisma, room.id);
   const state = parseState(room.stateJson, room.code);
   state.matchId = match.id;
 

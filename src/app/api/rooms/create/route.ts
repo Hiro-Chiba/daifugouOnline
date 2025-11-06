@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/db';
+import { getPrismaClient } from '@/lib/db';
 import { createEmptyState } from '@/lib/game/engine';
 import { serializeState } from '@/lib/game/state';
 
@@ -13,6 +13,7 @@ const generateCode = (): string => {
 };
 
 export async function POST() {
+  const prisma = getPrismaClient();
   let code = '';
   let isUnique = false;
   while (!isUnique) {

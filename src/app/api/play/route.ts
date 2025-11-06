@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/db';
+import type { PrismaClient } from '@prisma/client';
+import { getPrismaClient } from '@/lib/db';
 import { pusherServer } from '@/lib/pusher-server';
 import { applyPlay, syncForClient } from '@/lib/game/engine';
 import { parseState, serializeState } from '@/lib/game/state';
@@ -19,7 +20,7 @@ const findPlayerCards = (hand: Card[], cardIds: string[]): Card[] => {
     .filter((card): card is Card => Boolean(card));
 };
 
-const persistResultsIfFinished = async (state: GameState) => {
+const persistResultsIfFinished = async (prisma: PrismaClient, state: GameState) => {
   if (!state.matchId || !state.finished) {
     return;
   }
@@ -42,6 +43,7 @@ const persistResultsIfFinished = async (state: GameState) => {
 };
 
 export async function POST(request: Request) {
+  const prisma = getPrismaClient();
   const body = (await request.json()) as PlayRequestBody;
   if (!body.code || !body.userId || !body.cards) {
     return NextResponse.json({ error: '必要な情報が不足しています' }, { status: 400 });
@@ -82,7 +84,7 @@ export async function POST(request: Request) {
   }
 
   if (updatedState.finished) {
-    await persistResultsIfFinished(updatedState);
+    await persistResultsIfFinished(prisma, updatedState);
   }
 
   const publicState = syncForClient(updatedState, '');
