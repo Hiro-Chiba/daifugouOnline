@@ -10,9 +10,9 @@ interface ControlsProps {
 }
 
 const Controls = ({ isMyTurn, canPlay, onPlay, onPass, loading, statusMessage }: ControlsProps) => (
-  <div className="flex-column" style={{ marginTop: 16 }}>
-    <div>{statusMessage ?? (isMyTurn ? 'あなたの手番です' : '相手の手番です')}</div>
-    <div className="flex-column" style={{ flexDirection: 'row', gap: '12px' }}>
+  <div className="controls">
+    <div className="controls-status">{statusMessage ?? (isMyTurn ? 'あなたの手番です' : '相手の手番です')}</div>
+    <div className="controls-buttons">
       <button type="button" onClick={onPlay} disabled={!isMyTurn || !canPlay || loading}>
         {loading ? '送信中…' : '出す'}
       </button>
