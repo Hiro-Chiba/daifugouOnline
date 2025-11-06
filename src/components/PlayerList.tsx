@@ -1,3 +1,5 @@
+'use client';
+
 import type { PublicPlayerState } from '@/lib/game/types';
 
 interface PlayerListProps {

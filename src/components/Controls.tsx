@@ -1,3 +1,5 @@
+'use client';
+
 interface ControlsProps {
   isMyTurn: boolean;
   canPlay: boolean;
