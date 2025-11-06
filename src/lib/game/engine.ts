@@ -2,7 +2,17 @@ import { format } from 'date-fns';
 import { dealCards } from './deal';
 import { MIN_PLAYERS } from './constants';
 import { canPlay } from './validators';
-import type { Card, GamePlayer, GameState, PlayerId, Play, PublicState, ValidationResult } from './types';
+import type {
+  Card,
+  GamePlayer,
+  GameState,
+  PlayerId,
+  Play,
+  PublicState,
+  ValidationResult,
+  Rank,
+  Suit
+} from './types';
 
 const describeCards = (cards: Card[]): string =>
   cards
@@ -19,6 +29,36 @@ const describeCards = (cards: Card[]): string =>
       return `${suitIcon[card.suit] ?? ''}${card.rank}`;
     })
     .join(' ');
+
+const suitIconMap: Record<Suit, string> = {
+  clubs: '♣',
+  diamonds: '♦',
+  hearts: '♥',
+  spades: '♠'
+};
+
+const countByRank = (cards: Card[], rank: Rank): number =>
+  cards.filter((card) => card.rank === rank).length;
+
+const countJokers = (cards: Card[]): number => countByRank(cards, 'Joker');
+
+const getEffectiveCountForRank = (cards: Card[], rank: Rank): number => {
+  const rankCount = countByRank(cards, rank);
+  if (rankCount === 0) {
+    return 0;
+  }
+  const jokerCount = countJokers(cards);
+  if (jokerCount === 0) {
+    return rankCount;
+  }
+  if (jokerCount === 1 && rankCount >= 1 && rankCount <= 3) {
+    return Math.max(rankCount, 3);
+  }
+  return rankCount;
+};
+
+const getNonJokerSuits = (cards: Card[]): Suit[] =>
+  cards.filter((card) => card.suit !== 'joker').map((card) => card.suit as Suit);
 
 const cloneState = (state: GameState): GameState => ({
   roomCode: state.roomCode,
@@ -145,44 +185,82 @@ const checkForMatchEnd = (state: GameState) => {
 
 const registerEffects = (state: GameState, cards: Card[], playerId: PlayerId): boolean => {
   let keepTurn = false;
-  if (cards.some((card) => card.rank === 'J')) {
+
+  if (getEffectiveCountForRank(cards, 'J') > 0) {
     state = applyJackReverseOrder(state, playerId);
   }
-  if (cards.some((card) => card.rank === '8')) {
+
+  if (getEffectiveCountForRank(cards, '8') > 0) {
     state = applyEightCut(state, playerId);
     keepTurn = true;
   }
-  if (cards.some((card) => card.rank === '10')) {
-    state = applyTenDiscard(state, playerId);
+
+  const tenCount = getEffectiveCountForRank(cards, '10');
+  if (tenCount > 0) {
+    state = applyTenDiscard(state, playerId, tenCount);
   }
-  if (cards.some((card) => card.rank === 'Q')) {
-    state = applyQueenPurge(state, playerId);
+
+  const queenCount = getEffectiveCountForRank(cards, 'Q');
+  if (queenCount > 0) {
+    state = applyQueenPurge(state, playerId, queenCount);
   }
-  if (cards.some((card) => card.rank === '7')) {
-    state = applySevenGive(state, playerId);
+
+  const sevenCount = getEffectiveCountForRank(cards, '7');
+  if (sevenCount > 0) {
+    state = applySevenGive(state, playerId, sevenCount);
   }
-  if (cards.length === 3 && cards.every((card) => card.rank === '9')) {
+
+  if (getEffectiveCountForRank(cards, '9') > 0) {
     state = applyNineReverseRotation(state, playerId);
   }
+
   return keepTurn;
+};
+
+const updateSuitLockAfterPlay = (
+  state: GameState,
+  cards: Card[],
+  previousPlay: Play | null
+): GameState => {
+  if (!previousPlay) {
+    return state;
+  }
+  if (cards.some((card) => card.rank === '8')) {
+    return state;
+  }
+  const currentSuits = getNonJokerSuits(cards);
+  const previousSuits = getNonJokerSuits(previousPlay.cards);
+  if (!currentSuits.length || !previousSuits.length) {
+    return state;
+  }
+  const sharedSuit = currentSuits.find((suit) => previousSuits.includes(suit));
+  if (!sharedSuit) {
+    return state;
+  }
+  if (state.flags.lockSuit !== sharedSuit) {
+    state.flags.lockSuit = sharedSuit;
+    appendLog(state, `${suitIconMap[sharedSuit]}縛りが発生しました`);
+  }
+  return state;
 };
 
 const updateAwaitingSpade3 = (
   state: GameState,
   cards: Card[],
   previousPlay: Play | null
-): GameState => {
+): boolean => {
   if (cards.length === 1 && cards[0].rank === 'Joker') {
     state.flags.awaitingSpade3 = true;
     state.pendingEffects.push({ type: 'jokerCounter', payload: { playerId: previousPlay?.playerId } });
     appendLog(state, 'ジョーカーが場に出ました。次のプレイヤーは♠3でのみ返せます');
-    return state;
+    return false;
   }
   state.flags.awaitingSpade3 = false;
   if (cards.length === 1 && cards[0].rank === '3' && cards[0].suit === 'spades' && previousPlay) {
-    return applyJokerCounterBySpade3(state, previousPlay.playerId);
+    applyJokerCounterBySpade3(state, previousPlay.playerId);
+    return true;
   }
-  return state;
+  return false;
 };
 
 export const applyPlay = (
@@ -194,6 +272,7 @@ export const applyPlay = (
   if (!validation.ok) {
     return { state, result: validation };
   }
+  const previousPlay = state.table.lastPlay;
   const draft = cloneState(state);
   const playerIndex = draft.players.findIndex((item) => item.id === userId);
   if (playerIndex === -1) {
@@ -218,8 +297,10 @@ export const applyPlay = (
 
   appendLog(draft, `${player.name} が ${describeCards(cards)} を出しました`);
 
-  const keepTurn = registerEffects(draft, cards, userId);
-  updateAwaitingSpade3(draft, cards, state.table.lastPlay);
+  const effectKeepTurn = registerEffects(draft, cards, userId);
+  updateSuitLockAfterPlay(draft, cards, previousPlay);
+  const spadeThreeKeepTurn = updateAwaitingSpade3(draft, cards, previousPlay);
+  const keepTurn = effectKeepTurn || spadeThreeKeepTurn;
 
   if (draft.players[playerIndex].hand.length === 0) {
     draft.players[playerIndex].finished = true;
@@ -258,6 +339,7 @@ export const applyPass = (state: GameState, userId: PlayerId): GameState => {
     draft.table.lastPlay = null;
     draft.table.pile = [];
     draft.flags.awaitingSpade3 = false;
+    draft.flags.lockSuit = null;
     draft.players = draft.players.map((item) => ({ ...item, hasPassed: false }));
     draft.passStreak = 0;
     const lastPlayerId = state.table.lastPlay?.playerId ?? userId;
@@ -279,24 +361,43 @@ export const applyEightCut = (state: GameState, playerId: PlayerId): GameState =
   state.passStreak = 0;
   state.players = state.players.map((player) => ({ ...player, hasPassed: false }));
   state.flags.awaitingSpade3 = false;
+  state.flags.lockSuit = null;
   return state;
 };
 
-export const applyTenDiscard = (state: GameState, playerId: PlayerId): GameState => {
-  state.pendingEffects.push({ type: 'tenDiscard', payload: { playerId } });
-  appendLog(state, '10捨て：任意のカードを1枚捨ててください');
+export const applyTenDiscard = (
+  state: GameState,
+  playerId: PlayerId,
+  count: number
+): GameState => {
+  state.pendingEffects.push({
+    type: 'tenDiscard',
+    payload: { playerId, count, optional: true }
+  });
+  appendLog(state, `10捨て：最大${count}枚まで任意のカードを捨てられます`);
   return state;
 };
 
-export const applyQueenPurge = (state: GameState, playerId: PlayerId): GameState => {
-  state.pendingEffects.push({ type: 'queenPurge', payload: { playerId } });
-  appendLog(state, 'Q全消し：指定ランクのカードを全員が捨てます');
+export const applyQueenPurge = (
+  state: GameState,
+  playerId: PlayerId,
+  count: number
+): GameState => {
+  state.pendingEffects.push({ type: 'queenPurge', payload: { playerId, count } });
+  appendLog(state, `Qボンバー：宣言を${count}回行ってください`);
   return state;
 };
 
-export const applySevenGive = (state: GameState, playerId: PlayerId): GameState => {
-  state.pendingEffects.push({ type: 'sevenGive', payload: { playerId } });
-  appendLog(state, '7渡し：相手にカードを1枚渡してください');
+export const applySevenGive = (
+  state: GameState,
+  playerId: PlayerId,
+  count: number
+): GameState => {
+  state.pendingEffects.push({
+    type: 'sevenGive',
+    payload: { playerId, count, optional: true }
+  });
+  appendLog(state, `7渡し：最大${count}枚まで任意のカードを渡せます`);
   return state;
 };
 
@@ -309,6 +410,12 @@ export const applyJackReverseOrder = (state: GameState, playerId: PlayerId): Gam
 
 export const applyJokerCounterBySpade3 = (state: GameState, playerId: PlayerId): GameState => {
   state.flags.awaitingSpade3 = false;
+  state.flags.lockSuit = null;
+  state.table.requiredCount = null;
+  state.table.lastPlay = null;
+  state.table.pile = [];
+  state.passStreak = 0;
+  state.players = state.players.map((player) => ({ ...player, hasPassed: false }));
   appendLog(state, '♠3がジョーカーを打ち消しました');
   state.pendingEffects.push({ type: 'jokerCounter', payload: { playerId } });
   return state;
