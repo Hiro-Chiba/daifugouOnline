@@ -1,10 +1,17 @@
 'use client';
 
 import Image from 'next/image';
-import type { Card, PublicState } from '@/lib/game/types';
+import type { Card, PublicState, Suit } from '@/lib/game/types';
 import { getCardImagePath, getCardLabel } from '@/lib/game/cardAssets';
 
 const describeCards = (cards: Card[]): string => cards.map(getCardLabel).join(' ');
+
+const suitIconMap: Record<Suit, string> = {
+  clubs: '♣',
+  diamonds: '♦',
+  hearts: '♥',
+  spades: '♠'
+};
 
 interface TableProps {
   state: PublicState | null;
