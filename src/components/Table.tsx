@@ -1,18 +1,10 @@
 'use client';
 
+import Image from 'next/image';
 import type { Card, PublicState } from '@/lib/game/types';
+import { getCardImagePath, getCardLabel } from '@/lib/game/cardAssets';
 
-const suitIcon: Record<string, string> = {
-  clubs: '♣',
-  diamonds: '♦',
-  hearts: '♥',
-  spades: '♠'
-};
-
-const describeCards = (cards: Card[]): string =>
-  cards
-    .map((card) => (card.rank === 'Joker' ? 'ジョーカー' : `${suitIcon[card.suit] ?? ''}${card.rank}`))
-    .join(' ');
+const describeCards = (cards: Card[]): string => cards.map(getCardLabel).join(' ');
 
 interface TableProps {
   state: PublicState | null;
@@ -24,9 +16,23 @@ const Table = ({ state }: TableProps) => {
     <div className="table-area">
       <h3>場の状況</h3>
       {lastPlay ? (
-        <p>
-          最終プレイ: {lastPlay.cards.length}枚 [{describeCards(lastPlay.cards)}]
-        </p>
+        <div className="table-center">
+          <p>
+            最終プレイ: {lastPlay.cards.length}枚 [{describeCards(lastPlay.cards)}]
+          </p>
+          <div className="table-cards">
+            {lastPlay.cards.map((card) => (
+              <Image
+                key={card.id}
+                src={getCardImagePath(card)}
+                alt={getCardLabel(card)}
+                width={96}
+                height={144}
+                className="card-face table-card-face"
+              />
+            ))}
+          </div>
+        </div>
       ) : (
         <p>現在は場が流れています。</p>
       )}

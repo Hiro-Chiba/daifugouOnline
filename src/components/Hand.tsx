@@ -1,7 +1,9 @@
 'use client';
 
 import clsx from 'clsx';
+import Image from 'next/image';
 import type { Card } from '@/lib/game/types';
+import { getCardImagePath, getCardLabel } from '@/lib/game/cardAssets';
 
 interface HandProps {
   cards: Card[];
@@ -9,19 +11,13 @@ interface HandProps {
   onToggle: (cardId: string) => void;
 }
 
-const suitIcon: Record<string, string> = {
-  clubs: '♣',
-  diamonds: '♦',
-  hearts: '♥',
-  spades: '♠'
-};
-
 const Hand = ({ cards, selected, onToggle }: HandProps) => (
   <div className="hand-section">
     <h3>あなたの手札</h3>
     <div className="card-grid">
       {cards.map((card) => {
         const isSelected = selected.includes(card.id);
+        const imageClassName = clsx('card-face', isSelected && 'card-face-selected');
         return (
           <button
             key={card.id}
@@ -29,7 +25,13 @@ const Hand = ({ cards, selected, onToggle }: HandProps) => (
             className={clsx('card-item', isSelected && 'selected')}
             onClick={() => onToggle(card.id)}
           >
-            {card.rank === 'Joker' ? '🃏' : `${suitIcon[card.suit] ?? ''}${card.rank}`}
+            <Image
+              src={getCardImagePath(card)}
+              alt={getCardLabel(card)}
+              width={72}
+              height={108}
+              className={imageClassName}
+            />
           </button>
         );
       })}

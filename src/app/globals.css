@@ -129,24 +129,46 @@ select {
 }
 
 .card-item {
-  width: 60px;
-  height: 90px;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.08);
+  width: 72px;
+  height: 108px;
+  border-radius: 14px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  box-shadow: none;
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 2px solid transparent;
-  transition: transform 0.15s ease, border-color 0.15s ease;
-  font-weight: 600;
-  font-size: 18px;
-  color: #fff;
+  transition: transform 0.18s ease;
+}
+
+.card-item:focus-visible {
+  outline: none;
+}
+
+.card-item:focus-visible .card-face {
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.75), 0 18px 28px rgba(93, 155, 255, 0.35);
+}
+
+.card-item:not(:disabled):hover {
+  transform: translateY(-6px);
 }
 
 .card-item.selected {
-  border-color: #5d9bff;
-  transform: translateY(-6px);
-  background: rgba(93, 155, 255, 0.3);
+  transform: translateY(-10px);
+}
+
+.card-face {
+  width: 100%;
+  height: auto;
+  border-radius: 12px;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.45);
+  transition: box-shadow 0.2s ease;
+  display: block;
+}
+
+.card-face-selected {
+  box-shadow: 0 0 0 3px rgba(93, 155, 255, 0.85), 0 18px 28px rgba(93, 155, 255, 0.35);
 }
 
 .table-area {
@@ -155,6 +177,27 @@ select {
   padding: 16px;
   margin-bottom: 16px;
   box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.35);
+}
+
+.table-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  margin: 16px 0;
+}
+
+.table-cards {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+}
+
+.table-card-face {
+  width: 96px;
+  border-radius: 14px;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.4);
 }
 
 .log-list {
@@ -206,8 +249,11 @@ select {
   }
 
   .card-item {
-    width: 48px;
-    height: 72px;
-    font-size: 16px;
+    width: 56px;
+    height: 84px;
+  }
+
+  .table-card-face {
+    width: 72px;
   }
 }
