@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import GameBoard from '@/components/GameBoard';
 import Toast from '@/components/Toast';
 import { getPusherClient } from '@/lib/pusher-client';
+import { MIN_PLAYERS, MAX_PLAYERS } from '@/lib/game/constants';
 import type { Card, PublicState } from '@/lib/game/types';
 import { clearSession, loadSession, saveSession } from '@/lib/session';
 
@@ -299,8 +300,9 @@ const RoomPage = () => {
 
   const playersCount = state?.players.length ?? 0;
   const hasGameStarted = state?.players.some((player) => player.handCount > 0) ?? false;
-  const canStartGame = !hasGameStarted && playersCount >= 4;
-  const remainingPlayers = Math.max(0, 4 - playersCount);
+  const canStartGame = !hasGameStarted && playersCount >= MIN_PLAYERS;
+  const remainingPlayers = Math.max(0, MIN_PLAYERS - playersCount);
+  const isRoomFull = playersCount >= MAX_PLAYERS;
 
   return (
     <div className="flex-column">
@@ -318,10 +320,16 @@ const RoomPage = () => {
             {leaveLoading ? '退室中…' : 'ルームを退出'}
           </button>
         </div>
-        {!hasGameStarted && playersCount < 4 ? (
-          <small style={{ display: 'block', marginTop: 8 }}>
-            ゲーム開始にはあと{remainingPlayers}人必要です
-          </small>
+        {!hasGameStarted ? (
+          playersCount < MIN_PLAYERS ? (
+            <small style={{ display: 'block', marginTop: 8 }}>
+              ゲーム開始にはあと{remainingPlayers}人必要です
+            </small>
+          ) : isRoomFull ? (
+            <small style={{ display: 'block', marginTop: 8 }}>
+              ルームは満員です（最大{MAX_PLAYERS}人まで参加できます）
+            </small>
+          ) : null
         ) : null}
       </header>
       <GameBoard

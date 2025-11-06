@@ -3,6 +3,7 @@ import { getPrismaClient } from '@/lib/db';
 import { parseState, serializeState } from '@/lib/game/state';
 import { pusherServer } from '@/lib/pusher-server';
 import { startGameIfReady, syncForClient } from '@/lib/game/engine';
+import { MIN_PLAYERS } from '@/lib/game/constants';
 
 interface StartRequestBody {
   code?: string;
@@ -33,8 +34,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'すでにゲームが開始されています' }, { status: 400 });
   }
 
-  if (state.players.length < 4) {
-    return NextResponse.json({ error: '4人以上揃ってから開始してください' }, { status: 400 });
+  if (state.players.length < MIN_PLAYERS) {
+    return NextResponse.json(
+      { error: `${MIN_PLAYERS}人以上揃ってから開始してください` },
+      { status: 400 }
+    );
   }
 
   const updatedState = startGameIfReady(state);

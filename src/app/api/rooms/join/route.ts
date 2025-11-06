@@ -3,6 +3,7 @@ import type { PrismaClient } from '@prisma/client';
 import { getPrismaClient } from '@/lib/db';
 import { pusherServer } from '@/lib/pusher-server';
 import { startGameIfReady, syncForClient } from '@/lib/game/engine';
+import { MAX_PLAYERS } from '@/lib/game/constants';
 import { parseState, serializeState } from '@/lib/game/state';
 
 interface JoinRequestBody {
@@ -36,6 +37,13 @@ export async function POST(request: Request) {
   const match = await findOrCreateMatch(prisma, room.id);
   const state = parseState(room.stateJson, room.code);
   state.matchId = match.id;
+
+  if (state.players.length >= MAX_PLAYERS) {
+    return NextResponse.json(
+      { error: `これ以上参加できません（最大${MAX_PLAYERS}人まで）` },
+      { status: 400 }
+    );
+  }
 
   const user = await prisma.user.create({
     data: { name: body.name }
