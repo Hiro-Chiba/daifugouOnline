@@ -13,50 +13,47 @@ interface TableProps {
 const Table = ({ state }: TableProps) => {
   const lastPlay = state?.table.lastPlay;
   return (
-    <div className="table-area">
-      <h3>場の状況</h3>
-      {lastPlay ? (
-        <div className="table-center">
-          <p>
-            最終プレイ: {lastPlay.cards.length}枚 [{describeCards(lastPlay.cards)}]
-          </p>
-          <div className="table-cards">
-            {lastPlay.cards.map((card) => (
-              <Image
-                key={card.id}
-                src={getCardImagePath(card)}
-                alt={getCardLabel(card)}
-                width={96}
-                height={144}
-                className="card-face table-card-face"
-              />
-            ))}
-          </div>
-        </div>
-      ) : (
-        <p>現在は場が流れています。</p>
-      )}
-      <p>
-        強さ順: {state?.flags.strengthReversed ? '逆転中' : '通常'} / 順番:{' '}
-        {state?.flags.rotationReversed ? '逆回り' : '通常'}
-      </p>
-      {state?.flags.awaitingSpade3 ? <p>ジョーカー待ち：♠3のみ返せます</p> : null}
+    <div className="table-display">
+      <h3 className="table-title">現在の場</h3>
+      <div className="table-pile">
+        {lastPlay ? (
+          <>
+            <p className="table-summary">
+              {lastPlay.cards.length}枚 [{describeCards(lastPlay.cards)}]
+            </p>
+            <div className="table-cards">
+              {lastPlay.cards.map((card) => (
+                <Image
+                  key={card.id}
+                  src={getCardImagePath(card)}
+                  alt={getCardLabel(card)}
+                  width={96}
+                  height={144}
+                  className="card-face table-card-face"
+                />
+              ))}
+            </div>
+          </>
+        ) : (
+          <p className="table-summary">現在は場が流れています</p>
+        )}
+      </div>
+      <div className="table-flags">
+        <span>強さ順: {state?.flags.strengthReversed ? '逆転中' : '通常'}</span>
+        <span>順番: {state?.flags.rotationReversed ? '逆回り' : '通常'}</span>
+        {state?.flags.awaitingSpade3 ? (
+          <span className="table-alert">ジョーカー待ち：♠3のみ返せます</span>
+        ) : null}
+      </div>
       {state?.pendingEffects.length ? (
-        <div>
-          <p>未解決の効果:</p>
-          <ul>
-            {state.pendingEffects.map((effect, index) => (
-              <li key={`${effect.type}-${index}`}>{effect.type}</li>
-            ))}
-          </ul>
+        <div className="table-effects">
+          {state.pendingEffects.map((effect, index) => (
+            <span className="table-effect-chip" key={`${effect.type}-${index}`}>
+              {effect.type}
+            </span>
+          ))}
         </div>
       ) : null}
-      <h4>ログ</h4>
-      <ul className="log-list">
-        {state?.table.logs.map((log) => (
-          <li key={log}>{log}</li>
-        ))}
-      </ul>
     </div>
   );
 };

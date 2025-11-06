@@ -99,6 +99,9 @@ const findStarter = (hands: Record<PlayerId, Card[]>): PlayerId | null => {
   let minCard: Card | null = null;
   for (const [playerId, cards] of Object.entries(hands)) {
     for (const card of cards) {
+      if (card.rank === '3' && card.suit === 'diamonds') {
+        return playerId;
+      }
       if (card.rank === 'Joker') {
         continue;
       }

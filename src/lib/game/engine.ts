@@ -382,7 +382,7 @@ export const startGameIfReady = (state: GameState): GameState => {
   }));
   state.currentTurn = starter ?? playerIds[0] ?? null;
   state.startingPlayer = state.currentTurn;
-  appendLog(state, 'カードが配られました。最も小さいカードを持つプレイヤーから開始します');
+  appendLog(state, 'カードが配られました。ダイヤの3を持つプレイヤーから開始します');
   return state;
 };
 

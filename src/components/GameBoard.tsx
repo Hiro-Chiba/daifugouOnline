@@ -47,27 +47,33 @@ const GameBoard = ({
     ? '再接続中…'
     : undefined;
   return (
-    <div className="room-layout">
-      <aside>
-        <div style={{ marginBottom: 16 }}>
-          <span className="badge">
-            参加者: {players.length}人 / 接続: {connectionStatus === 'connected' ? '良好' : '再接続中'}
-          </span>
+    <div className="game-board">
+      <div className="game-info-bar">
+        <span className="badge">
+          参加者: {players.length}人 / 接続: {connectionStatus === 'connected' ? '良好' : '再接続中'}
+        </span>
+      </div>
+      <div className="game-stage">
+        <div className="table-arena">
+          <div className="table-arena-inner">
+            <PlayerList players={players} currentTurn={state?.currentTurn ?? null} />
+            <div className="table-center-display">
+              <Table state={state} />
+            </div>
+          </div>
         </div>
-        <PlayerList players={players} currentTurn={state?.currentTurn ?? null} />
-      </aside>
-      <section>
-        <Table state={state} />
-        <Hand cards={hand} selected={selected} onToggle={onToggle} />
-        <Controls
-          isMyTurn={Boolean(isMyTurn && selfPlayer && !selfPlayer.finished)}
-          canPlay={canPlay}
-          onPlay={onPlay}
-          onPass={onPass}
-          loading={loading}
-          statusMessage={statusMessage}
-        />
-      </section>
+        <div className="hand-section">
+          <Hand cards={hand} selected={selected} onToggle={onToggle} />
+          <Controls
+            isMyTurn={Boolean(isMyTurn && selfPlayer && !selfPlayer.finished)}
+            canPlay={canPlay}
+            onPlay={onPlay}
+            onPass={onPass}
+            loading={loading}
+            statusMessage={statusMessage}
+          />
+        </div>
+      </div>
     </div>
   );
 };
