@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getPrismaClient } from '@/lib/db';
+import { cleanupStaleRooms } from '@/lib/cleanup';
 import { parseState, serializeState } from '@/lib/game/state';
 import { syncForClient } from '@/lib/game/engine';
 import { pusherServer } from '@/lib/pusher-server';
@@ -11,6 +12,7 @@ interface SyncRequestBody {
 
 export async function POST(request: Request) {
   const prisma = getPrismaClient();
+  await cleanupStaleRooms(prisma);
   const body = (await request.json()) as SyncRequestBody;
   if (!body.code || !body.userId) {
     return NextResponse.json({ error: '必要な情報が不足しています' }, { status: 400 });

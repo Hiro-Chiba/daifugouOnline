@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { PrismaClient } from '@prisma/client';
 import { getPrismaClient } from '@/lib/db';
+import { cleanupStaleRooms } from '@/lib/cleanup';
 import { pusherServer } from '@/lib/pusher-server';
 import { applyPlay, syncForClient } from '@/lib/game/engine';
 import { parseState, serializeState } from '@/lib/game/state';
@@ -44,6 +45,7 @@ const persistResultsIfFinished = async (prisma: PrismaClient, state: GameState) 
 
 export async function POST(request: Request) {
   const prisma = getPrismaClient();
+  await cleanupStaleRooms(prisma);
   const body = (await request.json()) as PlayRequestBody;
   if (!body.code || !body.userId || !body.cards) {
     return NextResponse.json({ error: '必要な情報が不足しています' }, { status: 400 });
