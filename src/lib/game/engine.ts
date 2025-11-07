@@ -287,7 +287,10 @@ const applyRevolution = (state: GameState, playerId: PlayerId): GameState => {
   const player = state.players.find((item) => item.id === playerId);
   const name = player?.name ?? '不明なプレイヤー';
   if (state.flags.revolutionActive) {
-    appendLog(state, `${name} の革命！強さの順番が逆転しました`);
+    appendLog(
+      state,
+      `${name} の革命！強さの順番が${state.flags.strengthReversed ? '逆転' : '通常'}になりました`
+    );
   } else if (state.flags.strengthReversed) {
     appendLog(state, `${name} が革命返しを起こしましたが、J効果により強さの順番は逆転中です`);
   } else {
@@ -300,7 +303,7 @@ const registerEffects = (state: GameState, cards: Card[], playerId: PlayerId): b
   let keepTurn = false;
   const revolutionTriggered = isRevolutionPlay(cards);
 
-  if (!revolutionTriggered && getEffectiveCountForRank(cards, 'J') > 0) {
+  if (getEffectiveCountForRank(cards, 'J') > 0) {
     state = applyJackReverseOrder(state, playerId);
   }
 
