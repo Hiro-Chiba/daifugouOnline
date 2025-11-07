@@ -138,7 +138,6 @@ const Table = ({ state }: TableProps) => {
       ) : null}
       <div className="table-flags">
         <span>強さ順: {strengthStatus}</span>
-        <span>順番: {state?.flags.rotationReversed ? '逆回り' : '通常'}</span>
         <span>
           縛り: {state?.flags.lockSuit ? `${suitIconMap[state.flags.lockSuit]}縛り` : 'なし'}
         </span>
