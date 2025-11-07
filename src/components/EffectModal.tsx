@@ -51,10 +51,12 @@ const EffectModal = ({
   const declaredRanks = effect.payload?.declaredRanks ?? [];
   const isQueen = effect.type === 'queenPurge';
   const confirmDisabled = isQueen ? !rank : selected.length > limit;
+  const useLightTheme =
+    effect.type === 'sevenGive' || effect.type === 'tenDiscard' || effect.type === 'queenPurge';
 
   return (
     <div className="effect-overlay">
-      <div className="effect-modal">
+      <div className={clsx('effect-modal', useLightTheme && 'effect-modal-light')}>
         <h3 className="effect-title">{effectTitles[effect.type] ?? '効果'}</h3>
         <p className="effect-description">
           {effect.type === 'sevenGive'
