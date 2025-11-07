@@ -27,6 +27,9 @@ export async function POST(request: Request) {
   if (state.currentTurn !== body.userId) {
     return NextResponse.json({ error: '現在はあなたの手番ではありません' }, { status: 400 });
   }
+  if (state.activeEffect) {
+    return NextResponse.json({ error: '効果の処理を先に行ってください' }, { status: 400 });
+  }
 
   const updatedState = applyPass(state, body.userId);
   const serialized = serializeState(updatedState);

@@ -86,6 +86,12 @@ export const canPlay = (state: GameState, userId: PlayerId, cards: Card[]): Vali
   if (player.finished) {
     return { ok: false, reason: '既にあがっています' };
   }
+  if (state.activeEffect) {
+    if (state.activeEffect.playerId === userId) {
+      return { ok: false, reason: '効果を先に処理してください' };
+    }
+    return { ok: false, reason: '効果処理中です' };
+  }
   if (cards.length === 0) {
     return { ok: false, reason: 'カードを選択してください' };
   }

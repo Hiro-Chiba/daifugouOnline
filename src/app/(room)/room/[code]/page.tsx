@@ -3,10 +3,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import GameBoard from '@/components/GameBoard';
+import type { EffectControlsProps } from '@/components/Controls';
 import Toast from '@/components/Toast';
 import { getPusherClient } from '@/lib/pusher-client';
 import { MIN_PLAYERS, MAX_PLAYERS } from '@/lib/game/constants';
-import type { Card, PublicState } from '@/lib/game/types';
+import type { Card, PublicState, Rank } from '@/lib/game/types';
 import { clearSession, loadSession, saveSession } from '@/lib/session';
 
 interface SyncResponse {
@@ -24,6 +25,9 @@ interface StartResponse {
 interface LeaveResponse {
   state: PublicState;
 }
+
+const queenSelectableRanks: Rank[] = ['3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A', '2'];
+const queenRankOptionsList = queenSelectableRanks.map((rank) => ({ value: rank, label: rank }));
 
 const hydrateState = (state: PublicState, userId: string, handOverride?: Card[]): PublicState => ({
   ...state,
@@ -57,6 +61,9 @@ const RoomPage = () => {
   const [startLoading, setStartLoading] = useState(false);
   const [leaveLoading, setLeaveLoading] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<'connected' | 'reconnecting'>('connected');
+  const [effectLoading, setEffectLoading] = useState(false);
+  const [effectTarget, setEffectTarget] = useState<string>('');
+  const [effectRank, setEffectRank] = useState<Rank | ''>('');
 
   const roomCode = useMemo(() => (typeof params.code === 'string' ? params.code : params.code?.[0] ?? ''), [params.code]);
 
@@ -177,15 +184,35 @@ const RoomPage = () => {
 
   const toggleCard = useCallback(
     (cardId: string) => {
-      setSelected((prev) =>
-        prev.includes(cardId) ? prev.filter((id) => id !== cardId) : [...prev, cardId]
-      );
+      if (effectLoading) {
+        return;
+      }
+      setSelected((prev) => {
+        const isSelected = prev.includes(cardId);
+        if (isSelected) {
+          return prev.filter((id) => id !== cardId);
+        }
+        const activeEffect = state?.activeEffect;
+        if (
+          activeEffect &&
+          session?.userId === activeEffect.playerId &&
+          (activeEffect.type === 'tenDiscard' || activeEffect.type === 'sevenGive') &&
+          prev.length >= activeEffect.maxCount
+        ) {
+          return prev;
+        }
+        return [...prev, cardId];
+      });
     },
-    []
+    [effectLoading, state, session]
   );
 
   const handlePlay = useCallback(async () => {
     if (!session || selected.length === 0) {
+      return;
+    }
+    if (state?.activeEffect && state.activeEffect.playerId === session.userId) {
+      pushMessage('効果を先に処理してください');
       return;
     }
     try {
@@ -211,10 +238,14 @@ const RoomPage = () => {
     } finally {
       setLoading(false);
     }
-  }, [roomCode, session, selected, updateState, pushMessage]);
+  }, [roomCode, session, selected, state, updateState, pushMessage]);
 
   const handlePass = useCallback(async () => {
     if (!session) {
+      return;
+    }
+    if (state?.activeEffect) {
+      pushMessage('効果の処理を先に行ってください');
       return;
     }
     try {
@@ -236,7 +267,125 @@ const RoomPage = () => {
     } finally {
       setLoading(false);
     }
-  }, [roomCode, session, updateState, pushMessage]);
+  }, [roomCode, session, state, updateState, pushMessage]);
+
+  const handleEffectAction = useCallback(
+    async (action: 'execute' | 'skip') => {
+      if (!session || !state?.activeEffect || state.activeEffect.playerId !== session.userId) {
+        return;
+      }
+      const activeEffect = state.activeEffect;
+      const requiresTarget = activeEffect.type === 'sevenGive';
+      const requiresCards = activeEffect.type === 'tenDiscard' || activeEffect.type === 'sevenGive';
+      const requiresRank = activeEffect.type === 'queenBomber';
+      if (action === 'execute') {
+        if (requiresCards) {
+          if (selected.length === 0) {
+            pushMessage('カードを選択してください');
+            return;
+          }
+          if (selected.length > activeEffect.maxCount) {
+            pushMessage(`最大${activeEffect.maxCount}枚まで選択できます`);
+            return;
+          }
+        }
+        if (requiresTarget && !effectTarget) {
+          pushMessage('渡す相手を選択してください');
+          return;
+        }
+        if (requiresRank && !effectRank) {
+          pushMessage('宣言する数字を選択してください');
+          return;
+        }
+      }
+      const cardsPayload =
+        requiresCards && action === 'execute' ? selected : [];
+      const targetPayload =
+        requiresTarget && action === 'execute' ? effectTarget || undefined : undefined;
+      const declaredRankPayload =
+        requiresRank && action === 'execute' && effectRank ? effectRank : undefined;
+      try {
+        setEffectLoading(true);
+        const response = await fetch('/api/effect', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            code: roomCode,
+            userId: session.userId,
+            action,
+            cards: cardsPayload,
+            targetPlayerId: targetPayload,
+            declaredRank: declaredRankPayload
+          })
+        });
+        const data = (await response.json()) as PlayResponse & { error?: string };
+        if (!response.ok) {
+          pushMessage(data.error ?? '効果の処理に失敗しました');
+          return;
+        }
+        const selfPlayer = data.state.players.find((player) => player.id === session.userId);
+        const nextHand = (selfPlayer?.hand ?? []) as Card[];
+        setHand(nextHand);
+        setSelected([]);
+        setEffectTarget('');
+        setEffectRank('');
+        updateState(data.state, nextHand);
+      } catch (error) {
+        pushMessage('通信エラーが発生しました');
+      } finally {
+        setEffectLoading(false);
+      }
+    },
+    [
+      session,
+      state,
+      selected,
+      effectTarget,
+      effectRank,
+      roomCode,
+      updateState,
+      pushMessage
+    ]
+  );
+
+  const handleTargetChange = useCallback((value: string) => {
+    setEffectTarget(value);
+  }, []);
+
+  const handleRankChange = useCallback((value: string) => {
+    if (value === '') {
+      setEffectRank('');
+      return;
+    }
+    setEffectRank(value as Rank);
+  }, []);
+
+  useEffect(() => {
+    if (!session || !state?.activeEffect || state.activeEffect.playerId !== session.userId) {
+      if (effectTarget) {
+        setEffectTarget('');
+      }
+      if (effectRank) {
+        setEffectRank('');
+      }
+      return;
+    }
+    if (state.activeEffect.type !== 'sevenGive') {
+      if (effectTarget) {
+        setEffectTarget('');
+      }
+    } else if (
+      effectTarget &&
+      !state.players.some(
+        (player) => player.id === effectTarget && player.id !== session.userId && !player.finished
+      )
+    ) {
+      setEffectTarget('');
+    }
+    if (state.activeEffect.type !== 'queenBomber' && effectRank) {
+      setEffectRank('');
+    }
+  }, [state, session, effectTarget, effectRank]);
 
   const handleStartGame = useCallback(async () => {
     if (!session) {
@@ -294,6 +443,82 @@ const RoomPage = () => {
     }
   }, [roomCode, session, pushMessage, router]);
 
+  const effectControls = useMemo<EffectControlsProps | undefined>(() => {
+    if (!session || !state || !state.activeEffect || state.activeEffect.playerId !== session.userId) {
+      return undefined;
+    }
+    const selectedCount = selected.length;
+    const maxCount = state.activeEffect.maxCount;
+    if (state.activeEffect.type === 'tenDiscard') {
+      return {
+        type: 'tenDiscard',
+        maxCount,
+        selectedCount,
+        onExecute: () => handleEffectAction('execute'),
+        onSkip: () => handleEffectAction('skip'),
+        executeDisabled: selectedCount === 0 || selectedCount > maxCount,
+        skipDisabled: false,
+        loading: effectLoading
+      };
+    }
+    if (state.activeEffect.type === 'sevenGive') {
+      const targetOptions = state.players
+        .filter((player) => player.id !== session.userId && !player.finished)
+        .map((player) => ({ id: player.id, name: player.name }));
+      return {
+        type: 'sevenGive',
+        maxCount,
+        selectedCount,
+        onExecute: () => handleEffectAction('execute'),
+        onSkip: () => handleEffectAction('skip'),
+        executeDisabled:
+          selectedCount === 0 ||
+          selectedCount > maxCount ||
+          !effectTarget ||
+          targetOptions.length === 0,
+        skipDisabled: false,
+        loading: effectLoading,
+        targetValue: effectTarget || null,
+        onTargetChange: handleTargetChange,
+        targetOptions
+      };
+    }
+    if (state.activeEffect.type === 'queenBomber') {
+      return {
+        type: 'queenBomber',
+        remaining: state.activeEffect.remaining,
+        totalCount: state.activeEffect.totalCount,
+        selectedRank: effectRank,
+        onRankChange: handleRankChange,
+        onExecute: () => handleEffectAction('execute'),
+        executeDisabled: !effectRank,
+        loading: effectLoading,
+        rankOptions: queenRankOptionsList
+      };
+    }
+    return undefined;
+  }, [
+    session,
+    state,
+    selected,
+    handleEffectAction,
+    effectLoading,
+    effectTarget,
+    handleTargetChange,
+    effectRank,
+    handleRankChange
+  ]);
+
+  const statusMessageOverride = useMemo(() => {
+    if (!session || state?.finished || connectionStatus === 'reconnecting') {
+      return undefined;
+    }
+    if (!state?.activeEffect) {
+      return undefined;
+    }
+    return state.activeEffect.playerId === session.userId ? '効果を実行してください' : '効果処理待ちです';
+  }, [session, state, connectionStatus]);
+
   if (!session) {
     return null;
   }
@@ -342,6 +567,8 @@ const RoomPage = () => {
         onPass={handlePass}
         loading={loading}
         connectionStatus={connectionStatus}
+        effectControls={effectControls}
+        statusMessageOverride={statusMessageOverride}
       />
       <Toast messages={messages} />
     </div>

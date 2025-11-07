@@ -54,19 +54,23 @@ export interface Flags {
   awaitingSpade3: boolean;
 }
 
-export type EffectType =
-  | 'eightCut'
-  | 'tenDiscard'
-  | 'queenPurge'
-  | 'sevenGive'
-  | 'jackReverse'
-  | 'jokerCounter'
-  | 'nineReverse';
-
-export interface Effect {
-  type: EffectType;
-  payload?: Record<string, unknown>;
-}
+export type EffectPrompt =
+  | {
+      type: 'tenDiscard';
+      playerId: PlayerId;
+      maxCount: number;
+    }
+  | {
+      type: 'sevenGive';
+      playerId: PlayerId;
+      maxCount: number;
+    }
+  | {
+      type: 'queenBomber';
+      playerId: PlayerId;
+      remaining: number;
+      totalCount: number;
+    };
 
 export interface GameState {
   roomCode: string;
@@ -75,7 +79,7 @@ export interface GameState {
   startingPlayer: PlayerId | null;
   flags: Flags;
   table: TableState;
-  pendingEffects: Effect[];
+  activeEffect: EffectPrompt | null;
   turnHistory: Play[];
   finished: boolean;
   passStreak: number;
@@ -100,7 +104,7 @@ export interface PublicState {
   currentTurn: PlayerId | null;
   flags: Flags;
   table: TableState;
-  pendingEffects: Effect[];
+  activeEffect: EffectPrompt | null;
   finished: boolean;
 }
 
