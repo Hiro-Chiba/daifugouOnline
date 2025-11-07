@@ -259,6 +259,10 @@ select {
   flex-wrap: wrap;
   justify-content: center;
   gap: 8px;
+  padding: 12px 16px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 10px 20px rgba(5, 12, 32, 0.2);
 }
 
 .table-card-face {

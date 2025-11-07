@@ -48,6 +48,19 @@ const hydrateState = (state: PublicState, userId: string, handOverride?: Card[])
 
 const queenRankOptions: Rank[] = ['3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A', '2'];
 
+const getEffectSelectableCount = (effect: Effect | null): number => {
+  if (!effect?.payload) {
+    return 0;
+  }
+  if (typeof effect.payload.remaining === 'number') {
+    return effect.payload.remaining;
+  }
+  if (typeof effect.payload.count === 'number') {
+    return effect.payload.count;
+  }
+  return 0;
+};
+
 const RoomPage = () => {
   const params = useParams<{ code: string }>();
   const router = useRouter();
@@ -93,10 +106,7 @@ const RoomPage = () => {
     );
   }, [session, state]);
 
-  const effectLimit = useMemo(
-    () => (typeof activeEffect?.payload?.count === 'number' ? activeEffect.payload.count : 0),
-    [activeEffect]
-  );
+  const effectLimit = useMemo(() => getEffectSelectableCount(activeEffect), [activeEffect]);
 
   useEffect(() => {
     if (!session || session.roomCode !== roomCode) {
@@ -266,10 +276,10 @@ const RoomPage = () => {
         if (activeEffect.type === 'queenPurge') {
           return prev;
         }
-        const limit =
-          typeof activeEffect.payload?.count === 'number' ? activeEffect.payload.count : 0;
+        const limit = getEffectSelectableCount(activeEffect);
         if (limit > 0 && prev.length >= limit) {
-          return prev;
+          const next = [...prev.slice(1), cardId];
+          return next;
         }
         return [...prev, cardId];
       });

@@ -236,6 +236,17 @@ const finalizeEffectState = (state: GameState, actorId: PlayerId) => {
   state.currentTurn = calculateNextPlayer(state, actorId, false);
 };
 
+const clearStrengthReversal = (state: GameState): GameState => {
+  if (!state.flags.strengthReversed) {
+    state.pendingEffects = state.pendingEffects.filter((effect) => effect.type !== 'jackReverse');
+    return state;
+  }
+  state.flags.strengthReversed = false;
+  state.pendingEffects = state.pendingEffects.filter((effect) => effect.type !== 'jackReverse');
+  appendLog(state, 'Jバックの効果が終了し、強さ順が通常に戻りました');
+  return state;
+};
+
 const registerEffects = (state: GameState, cards: Card[], playerId: PlayerId): boolean => {
   let keepTurn = false;
 
@@ -408,6 +419,7 @@ export const applyPass = (state: GameState, userId: PlayerId): GameState => {
     draft.table.pile = [];
     draft.flags.awaitingSpade3 = false;
     draft.flags.lockSuit = null;
+    clearStrengthReversal(draft);
     draft.players = draft.players.map((item) => ({ ...item, hasPassed: false }));
     draft.passStreak = 0;
     const lastPlayerId = state.table.lastPlay?.playerId ?? userId;
@@ -618,6 +630,7 @@ export const applyEightCut = (state: GameState, playerId: PlayerId): GameState =
   state.players = state.players.map((player) => ({ ...player, hasPassed: false }));
   state.flags.awaitingSpade3 = false;
   state.flags.lockSuit = null;
+  clearStrengthReversal(state);
   return state;
 };
 
@@ -675,6 +688,7 @@ export const applyJokerCounterBySpade3 = (state: GameState, playerId: PlayerId):
   state.table.pile = [];
   state.passStreak = 0;
   state.players = state.players.map((player) => ({ ...player, hasPassed: false }));
+  clearStrengthReversal(state);
   appendLog(state, '♠3がジョーカーを打ち消しました');
   state.pendingEffects.push({ type: 'jokerCounter', payload: { playerId } });
   return state;
