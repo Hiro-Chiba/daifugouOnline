@@ -43,6 +43,7 @@ const GameBoard = ({
     state?.players.some((player) => player.handCount > 0) ?? hand.length > 0;
   const selfPlayer = players.find((player) => player.id === selfPlayerId);
   const isMyTurn = state?.currentTurn === selfPlayerId;
+  const rotationReversed = state?.flags.rotationReversed ?? false;
   const cardMap = new Map(hand.map((card) => [card.id, card]));
   const selectionCards = selected
     .map((cardId) => cardMap.get(cardId))
@@ -95,6 +96,26 @@ const GameBoard = ({
           <div className="round-table-surface" />
           <div className="round-table-center">
             <Table state={state} />
+          </div>
+          <div
+            className={clsx(
+              'turn-direction-indicator',
+              rotationReversed && 'turn-direction-indicator-reverse'
+            )}
+            role="img"
+            aria-label={`ターン順: ${rotationReversed ? '反時計回り（逆回り）' : '時計回り（通常）'}`}
+          >
+            <svg
+              viewBox="0 0 200 200"
+              className="turn-direction-visual"
+              aria-hidden="true"
+            >
+              <circle className="turn-direction-ring" cx="100" cy="100" r="88" />
+              <path
+                className="turn-direction-arrow"
+                d="M100 26 A74 74 0 0 1 170 100 M170 100 L154 90 M170 100 L164 82"
+              />
+            </svg>
           </div>
           <PlayerList players={players} currentTurn={state?.currentTurn ?? null} />
         </div>
