@@ -276,15 +276,18 @@ const RoomPage = () => {
         if (activeEffect.type === 'queenPurge') {
           return prev;
         }
-        const limit = getEffectSelectableCount(activeEffect);
-        if (limit > 0 && prev.length >= limit) {
-          const next = [...prev.slice(1), cardId];
-          return next;
+        if (effectLimit > 0 && prev.length >= effectLimit) {
+          pushMessage(`最大${effectLimit}枚まで選べます`);
+          return prev;
+        }
+        if (effectLimit === 0) {
+          pushMessage('この効果ではカードを選択できません');
+          return prev;
         }
         return [...prev, cardId];
       });
     },
-    [activeEffect]
+    [activeEffect, effectLimit, pushMessage]
   );
 
   const handlePlay = useCallback(async () => {
@@ -398,6 +401,14 @@ const RoomPage = () => {
       if (!session || !activeEffect) {
         return;
       }
+      if (
+        (activeEffect.type === 'sevenGive' || activeEffect.type === 'tenDiscard') &&
+        !options?.skip &&
+        effectSelection.length > effectLimit
+      ) {
+        pushMessage(`最大${effectLimit}枚まで選べます`);
+        return;
+      }
       try {
         setEffectLoading(true);
         const payload: Record<string, unknown> = {
@@ -406,10 +417,7 @@ const RoomPage = () => {
           type: activeEffect.type
         };
         if (activeEffect.type === 'sevenGive' || activeEffect.type === 'tenDiscard') {
-          const limit =
-            typeof activeEffect.payload?.count === 'number'
-              ? activeEffect.payload.count
-              : effectSelection.length;
+          const limit = effectLimit > 0 ? effectLimit : effectSelection.length;
           const cards = options?.skip ? [] : effectSelection.slice(0, limit);
           payload.cards = cards;
         } else if (activeEffect.type === 'queenPurge') {
@@ -433,7 +441,16 @@ const RoomPage = () => {
         setEffectLoading(false);
       }
     },
-    [activeEffect, applyIncomingState, effectRank, effectSelection, pushMessage, roomCode, session]
+    [
+      activeEffect,
+      applyIncomingState,
+      effectLimit,
+      effectRank,
+      effectSelection,
+      pushMessage,
+      roomCode,
+      session
+    ]
   );
 
   if (!session) {
