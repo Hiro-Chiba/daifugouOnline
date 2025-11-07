@@ -34,8 +34,6 @@ const hasUniformRank = (cards: Card[]): boolean => {
   return nonJokers.every((card) => card.rank === first);
 };
 
-const containsJoker = (cards: Card[]): boolean => cards.some((card) => card.rank === 'Joker');
-
 const includesRank = (cards: Card[], rank: Rank): boolean => cards.some((card) => card.rank === rank);
 
 const playerHasCards = (hand: Card[], cards: Card[]): boolean => {
@@ -139,14 +137,8 @@ export const canPlay = (state: GameState, userId: PlayerId, cards: Card[]): Vali
 
   if (state.flags.lockSuit) {
     const suits = extractSuits(cards);
-    if (suits.length === 0) {
-      if (!containsJoker(cards)) {
-        return {
-          ok: false,
-          reason: `${describeSuit(state.flags.lockSuit)}のカードのみ出せます`
-        };
-      }
-    } else if (!suits.every((suit) => suit === state.flags.lockSuit)) {
+    const hasLockSuit = suits.includes(state.flags.lockSuit);
+    if (!hasLockSuit) {
       return {
         ok: false,
         reason: `${describeSuit(state.flags.lockSuit)}のカードのみ出せます`
