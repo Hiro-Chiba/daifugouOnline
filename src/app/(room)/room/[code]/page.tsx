@@ -9,6 +9,7 @@ import { getPusherClient } from '@/lib/pusher-client';
 import { MIN_PLAYERS, MAX_PLAYERS } from '@/lib/game/constants';
 import type { Card, PublicState, Rank, Effect } from '@/lib/game/types';
 import { clearSession, loadSession, saveSession } from '@/lib/session';
+import { sortHand, type HandSortMode } from '@/lib/game/sort';
 
 interface SyncResponse {
   state: PublicState;
@@ -66,7 +67,7 @@ const RoomPage = () => {
   const router = useRouter();
   const [session, setSession] = useState(loadSession());
   const [state, setState] = useState<PublicState | null>(null);
-  const [hand, setHand] = useState<Card[]>([]);
+  const [rawHand, setRawHand] = useState<Card[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
   const [effectSelection, setEffectSelection] = useState<string[]>([]);
   const [effectRank, setEffectRank] = useState<Rank>('3');
@@ -77,10 +78,16 @@ const RoomPage = () => {
   const [leaveLoading, setLeaveLoading] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<'connected' | 'reconnecting'>('connected');
   const [isInfoCollapsed, setIsInfoCollapsed] = useState(true);
+  const [sortMode, setSortMode] = useState<HandSortMode>('none');
   const effectSignatureRef = useRef<string | null>(null);
   const queenEffectSignatureRef = useRef<string | null>(null);
 
   const roomCode = useMemo(() => (typeof params.code === 'string' ? params.code : params.code?.[0] ?? ''), [params.code]);
+
+  const hand = useMemo(
+    () => sortHand(rawHand, sortMode, { strengthReversed: state?.flags.strengthReversed ?? false }),
+    [rawHand, sortMode, state?.flags.strengthReversed]
+  );
 
   const activeEffect = useMemo<Effect | null>(() => {
     if (!state || !session) {
@@ -171,6 +178,18 @@ const RoomPage = () => {
     setEffectSelection((prev) => prev.filter((id) => hand.some((card) => card.id === id)));
   }, [hand]);
 
+  useEffect(() => {
+    if (!session) {
+      return;
+    }
+    setState((prev) => {
+      if (!prev) {
+        return prev;
+      }
+      return hydrateState(prev, session.userId, hand);
+    });
+  }, [hand, session]);
+
   const pushMessage = useCallback((message: string) => {
     setMessages((prev) => [...prev.slice(-2), message]);
     setTimeout(() => {
@@ -196,12 +215,15 @@ const RoomPage = () => {
       }
       const selfPlayer = incoming.players.find((player) => player.id === session.userId);
       const nextHand = (selfPlayer?.hand ?? []) as Card[];
-      setHand(nextHand);
+      const sortedNextHand = sortHand(nextHand, sortMode, {
+        strengthReversed: incoming.flags.strengthReversed
+      });
+      setRawHand(nextHand);
       setSelected((prev) => prev.filter((id) => nextHand.some((card) => card.id === id)));
       setEffectSelection((prev) => prev.filter((id) => nextHand.some((card) => card.id === id)));
-      updateState(incoming, nextHand);
+      updateState(incoming, sortedNextHand);
     },
-    [session, updateState]
+    [session, sortMode, updateState]
   );
 
   const syncState = useCallback(async () => {
@@ -296,6 +318,14 @@ const RoomPage = () => {
     },
     []
   );
+
+  const handleSortByStrength = useCallback(() => {
+    setSortMode((prev) => (prev === 'strength' ? 'none' : 'strength'));
+  }, []);
+
+  const handleSortBySuit = useCallback(() => {
+    setSortMode((prev) => (prev === 'suit' ? 'none' : 'suit'));
+  }, []);
 
   const handleEffectCardToggle = useCallback(
     (cardId: string) => {
@@ -557,6 +587,9 @@ const RoomPage = () => {
         hand={hand}
         selected={selected}
         onToggle={toggleCard}
+        onSortByStrength={handleSortByStrength}
+        onSortBySuit={handleSortBySuit}
+        sortMode={sortMode}
         onPlay={handlePlay}
         onPass={handlePass}
         loading={loading}
