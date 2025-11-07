@@ -30,6 +30,8 @@ const GameBoard = ({
   connectionStatus
 }: GameBoardProps) => {
   const players = state?.players ?? [];
+  const hasGameStarted =
+    state?.players.some((player) => player.handCount > 0) ?? hand.length > 0;
   const selfPlayer = players.find((player) => player.id === selfPlayerId);
   const isMyTurn = state?.currentTurn === selfPlayerId;
   const cardMap = new Map(hand.map((card) => [card.id, card]));
@@ -85,22 +87,24 @@ const GameBoard = ({
           <PlayerList players={players} currentTurn={state?.currentTurn ?? null} />
         </div>
       </div>
-      <section className="hand-panel">
-        <div className="hand-header">
-          <h3>あなたの手札</h3>
-          {selfPlayer ? <span className="hand-count">残り {selfPlayer.handCount}枚</span> : null}
-        </div>
-        <Hand cards={hand} selected={selected} onToggle={onToggle} />
-        <Controls
-          isMyTurn={Boolean(isMyTurn && selfPlayer && !selfPlayer.finished)}
-          canPlay={canPlay}
-          onPlay={onPlay}
-          onPass={onPass}
-          loading={loading}
-          statusMessage={statusMessage}
-          canPass={canPass}
-        />
-      </section>
+      {hasGameStarted ? (
+        <section className="hand-panel">
+          <div className="hand-header">
+            <h3>あなたの手札</h3>
+            {selfPlayer ? <span className="hand-count">残り {selfPlayer.handCount}枚</span> : null}
+          </div>
+          <Hand cards={hand} selected={selected} onToggle={onToggle} />
+          <Controls
+            isMyTurn={Boolean(isMyTurn && selfPlayer && !selfPlayer.finished)}
+            canPlay={canPlay}
+            onPlay={onPlay}
+            onPass={onPass}
+            loading={loading}
+            statusMessage={statusMessage}
+            canPass={canPass}
+          />
+        </section>
+      ) : null}
     </div>
   );
 };
