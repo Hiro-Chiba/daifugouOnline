@@ -61,18 +61,11 @@ const GameBoard = ({
       : undefined);
   return (
     <div className="game-board">
-      <div className="game-info-bar">
-        <span className="badge">
-          参加者: {players.length}人 / 接続: {connectionStatus === 'connected' ? '良好' : '再接続中'}
-        </span>
-      </div>
-      <div className="game-stage">
-        <div className="table-arena">
-          <div className="table-arena-inner">
-            <PlayerList players={players} currentTurn={state?.currentTurn ?? null} />
-            <div className="table-center-display">
-              <Table state={state} />
-            </div>
+      <div className="board-grid">
+        <section className="table-panel">
+          <div className="board-status">
+            <span className="badge">参加者: {players.length}人</span>
+            <span className={`badge badge-${connectionStatus}`}>接続: {connectionLabel}</span>
           </div>
         </div>
         <div className="hand-section">
@@ -88,6 +81,21 @@ const GameBoard = ({
           />
         </div>
       </div>
+      <section className="hand-panel">
+        <div className="hand-header">
+          <h3>あなたの手札</h3>
+          {selfPlayer ? <span className="hand-count">残り {selfPlayer.handCount}枚</span> : null}
+        </div>
+        <Hand cards={hand} selected={selected} onToggle={onToggle} />
+        <Controls
+          isMyTurn={Boolean(isMyTurn && selfPlayer && !selfPlayer.finished)}
+          canPlay={canPlay}
+          onPlay={onPlay}
+          onPass={onPass}
+          loading={loading}
+          statusMessage={statusMessage}
+        />
+      </section>
     </div>
   );
 };
