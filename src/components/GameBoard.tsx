@@ -39,13 +39,18 @@ const GameBoard = ({
   sortMode
 }: GameBoardProps) => {
   const players = state?.players ?? [];
+  const hasGameStarted =
+    state?.players.some((player) => player.handCount > 0) ?? hand.length > 0;
   const selfPlayer = players.find((player) => player.id === selfPlayerId);
   const isMyTurn = state?.currentTurn === selfPlayerId;
   const cardMap = new Map(hand.map((card) => [card.id, card]));
   const selectionCards = selected
     .map((cardId) => cardMap.get(cardId))
     .filter((card): card is Card => Boolean(card));
-  const uniqueRanks = new Set(selectionCards.map((card) => card.rank));
+  const nonJokerRanks = new Set(
+    selectionCards.filter((card) => card.rank !== 'Joker').map((card) => card.rank)
+  );
+  const hasUniformRank = nonJokerRanks.size <= 1;
   const effectLock =
     state?.pendingEffects.some((effect) => {
       if (!effect.payload || effect.payload.playerId !== selfPlayerId) {
@@ -68,7 +73,7 @@ const GameBoard = ({
   const canPlay =
     selectionCards.length === selected.length &&
     selectionCards.length > 0 &&
-    (uniqueRanks.size === 1 || (selectionCards.length === 1 && selectionCards[0]?.rank === 'Joker')) &&
+    hasUniformRank &&
     !effectLock;
   const canPass = !effectLock;
   const statusMessage = state?.finished
