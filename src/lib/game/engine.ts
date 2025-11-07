@@ -712,7 +712,8 @@ export const syncForClient = (state: GameState, viewerId: PlayerId): PublicState
     finished: player.finished,
     result: player.result,
     isSelf: player.id === viewerId,
-    hand: player.id === viewerId ? player.hand : undefined
+    hand: player.id === viewerId ? player.hand : undefined,
+    ready: player.ready
   })),
   currentTurn: state.currentTurn,
   flags: { ...state.flags },
@@ -732,6 +733,10 @@ export const startGameIfReady = (state: GameState): GameState => {
   }
   const alreadyDealt = state.players.some((player) => player.hand.length > 0);
   if (alreadyDealt) {
+    return state;
+  }
+  const everyoneReady = state.players.every((player) => player.ready);
+  if (!everyoneReady) {
     return state;
   }
   const ordered = [...state.players].sort((a, b) => a.seat - b.seat);
@@ -758,7 +763,8 @@ export const startGameIfReady = (state: GameState): GameState => {
     hand: hands[player.id] ?? [],
     finished: false,
     hasPassed: false,
-    result: null
+    result: null,
+    ready: false
   }));
   state.currentTurn = starter ?? playerIds[0] ?? null;
   state.startingPlayer = state.currentTurn;
@@ -797,7 +803,8 @@ export const removePlayer = (
     finished: true,
     result: options?.resultLabel ?? leavingPlayer.result ?? '退室',
     hand: [],
-    hasPassed: true
+    hasPassed: true,
+    ready: false
   };
 
   if (state.currentTurn === playerId) {

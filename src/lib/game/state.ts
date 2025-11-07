@@ -7,9 +7,14 @@ export const parseState = (input: string | null | undefined, roomCode: string): 
   }
   try {
     const parsed = JSON.parse(input) as GameState;
+    const players = (parsed.players ?? []).map((player) => ({
+      ...player,
+      ready: Boolean(player.ready)
+    }));
     return {
       ...createEmptyState(roomCode),
       ...parsed,
+      players,
       roomCode
     };
   } catch (error) {

@@ -11,6 +11,7 @@ interface PlayerListProps {
 
 const PlayerList = ({ players, currentTurn }: PlayerListProps) => {
   const count = players.length || 1;
+  const hasGameStarted = players.some((player) => player.handCount > 0);
   return (
     <div className="player-circle">
       {players.map((player, index) => {
@@ -38,7 +39,13 @@ const PlayerList = ({ players, currentTurn }: PlayerListProps) => {
               {player.isSelf ? '（あなた）' : ''}
             </span>
             <span className="player-seat-meta">
-              {player.finished ? player.result ?? '上がり' : `手札: ${player.handCount}枚`}
+              {player.finished
+                ? player.result ?? '上がり'
+                : hasGameStarted
+                ? `手札: ${player.handCount}枚`
+                : player.ready
+                ? '準備完了'
+                : '準備待ち'}
             </span>
           </div>
         );

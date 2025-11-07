@@ -36,6 +36,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'すでにゲームが開始されています' }, { status: 400 });
   }
 
+  if (player.ready) {
+    return NextResponse.json({ state: syncForClient(state, body.userId) });
+  }
+
   if (state.players.length < MIN_PLAYERS) {
     return NextResponse.json(
       { error: `${MIN_PLAYERS}人以上揃ってから開始してください` },
@@ -43,10 +47,24 @@ export async function POST(request: Request) {
     );
   }
 
+  player.ready = true;
   const updatedState = startGameIfReady(state);
   const dealt = updatedState.players.some((item) => item.hand.length > 0);
   if (!dealt) {
-    return NextResponse.json({ error: 'ゲーム開始に失敗しました' }, { status: 500 });
+    await prisma.room.update({
+      where: { id: room.id },
+      data: {
+        stateJson: serializeState(updatedState)
+      }
+    });
+
+    const publicState = syncForClient(updatedState, '');
+    await pusherServer.trigger(`presence-room-${room.code}`, 'system-message', {
+      message: `${player.name} さんが開始準備OKです`,
+      state: publicState
+    });
+
+    return NextResponse.json({ state: syncForClient(updatedState, body.userId) });
   }
 
   await prisma.room.update({

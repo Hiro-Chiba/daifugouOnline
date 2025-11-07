@@ -67,7 +67,8 @@ export async function POST(request: Request) {
       connected: true,
       finished: false,
       result: null,
-      hasPassed: false
+      hasPassed: false,
+      ready: false
     });
   }
 
