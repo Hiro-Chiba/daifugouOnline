@@ -50,6 +50,8 @@ export interface TableState {
 
 export interface Flags {
   strengthReversed: boolean;
+  revolutionActive: boolean;
+  jackReversalActive: boolean;
   rotationReversed: boolean;
   lockSuit: Suit | null;
   awaitingSpade3: boolean;
