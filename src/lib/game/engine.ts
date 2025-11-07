@@ -481,81 +481,87 @@ export const applyEffectAction = (
     };
   }
 
-  if (effect.type === 'sevenGive' || effect.type === 'tenDiscard') {
-    const limit = typeof effect.payload?.count === 'number' ? effect.payload.count : 0;
-    const uniqueIds = [...new Set(action.cards)];
-    if (uniqueIds.length !== action.cards.length) {
-      return {
-        state: draft,
-        result: { ok: false, reason: '同じカードを複数回選択することはできません' }
-      };
-    }
-    if (uniqueIds.length > limit) {
-      return {
-        state: draft,
-        result: { ok: false, reason: `最大${limit}枚まで選択できます` }
-      };
-    }
-    const cards = extractCardsFromHand(player, uniqueIds);
-    if (cards.length !== uniqueIds.length) {
-      return { state: draft, result: { ok: false, reason: '無効なカードが含まれています' } };
-    }
-    let targetIndex = -1;
-    if (effect.type === 'sevenGive' && cards.length > 0) {
-      const targetId = calculateNextPlayer(draft, action.playerId, false);
-      if (!targetId) {
-        return {
-          state: draft,
-          result: { ok: false, reason: '渡せる相手がいません' }
-        };
-      }
-      targetIndex = draft.players.findIndex((item) => item.id === targetId);
-      if (targetIndex === -1) {
-        return {
-          state: draft,
-          result: { ok: false, reason: '渡せる相手がいません' }
-        };
-      }
-    }
-    draft.players[playerIndex] = {
-      ...player,
-      hand: removeCardsById(player.hand, uniqueIds),
-      hasPassed: false
-    };
-
-    if (effect.type === 'sevenGive' && cards.length > 0) {
-      const receiver = draft.players[targetIndex];
-      draft.players[targetIndex] = {
-        ...receiver,
-        hand: [...receiver.hand, ...cards]
-      };
-      appendLog(draft, `${player.name} が7渡しで ${cards.length}枚を ${receiver.name} に渡しました`);
-    } else if (effect.type === 'sevenGive') {
-      appendLog(draft, `${player.name} は7渡しでカードを渡しませんでした`);
-    }
-
-    if (effect.type === 'tenDiscard') {
-      if (cards.length > 0) {
-        appendLog(draft, `${player.name} が10捨てで ${cards.length}枚捨てました`);
-      } else {
-        appendLog(draft, `${player.name} は10捨てでカードを捨てませんでした`);
-      }
-    }
-
-    const updatedPlayer = draft.players[playerIndex];
-    completePlayerIfOutOfCards(draft, updatedPlayer);
-
-    draft.pendingEffects.splice(effectIndex, 1);
-    finalizeEffectState(draft, action.playerId);
-    return { state: draft, result: { ok: true } };
+  if (effect.type !== action.type) {
+    return { state: draft, result: { ok: false, reason: '効果情報が一致しません' } };
   }
 
-  if (effect.type === 'queenPurge') {
-    if (!isPlayableRank(action.rank)) {
-      return { state: draft, result: { ok: false, reason: '選択できないランクです' } };
+  switch (action.type) {
+    case 'sevenGive':
+    case 'tenDiscard': {
+      const limit = typeof effect.payload?.count === 'number' ? effect.payload.count : 0;
+      const uniqueIds = [...new Set(action.cards)];
+      if (uniqueIds.length !== action.cards.length) {
+        return {
+          state: draft,
+          result: { ok: false, reason: '同じカードを複数回選択することはできません' }
+        };
+      }
+      if (uniqueIds.length > limit) {
+        return {
+          state: draft,
+          result: { ok: false, reason: `最大${limit}枚まで選択できます` }
+        };
+      }
+      const cards = extractCardsFromHand(player, uniqueIds);
+      if (cards.length !== uniqueIds.length) {
+        return { state: draft, result: { ok: false, reason: '無効なカードが含まれています' } };
+      }
+      let targetIndex = -1;
+      if (action.type === 'sevenGive' && cards.length > 0) {
+        const targetId = calculateNextPlayer(draft, action.playerId, false);
+        if (!targetId) {
+          return {
+            state: draft,
+            result: { ok: false, reason: '渡せる相手がいません' }
+          };
+        }
+        targetIndex = draft.players.findIndex((item) => item.id === targetId);
+        if (targetIndex === -1) {
+          return {
+            state: draft,
+            result: { ok: false, reason: '渡せる相手がいません' }
+          };
+        }
+      }
+      draft.players[playerIndex] = {
+        ...player,
+        hand: removeCardsById(player.hand, uniqueIds),
+        hasPassed: false
+      };
+
+      if (action.type === 'sevenGive' && cards.length > 0) {
+        const receiver = draft.players[targetIndex];
+        draft.players[targetIndex] = {
+          ...receiver,
+          hand: [...receiver.hand, ...cards]
+        };
+        appendLog(draft, `${player.name} が7渡しで ${cards.length}枚を ${receiver.name} に渡しました`);
+      } else if (action.type === 'sevenGive') {
+        appendLog(draft, `${player.name} は7渡しでカードを渡しませんでした`);
+      }
+
+      if (action.type === 'tenDiscard') {
+        if (cards.length > 0) {
+          appendLog(draft, `${player.name} が10捨てで ${cards.length}枚捨てました`);
+        } else {
+          appendLog(draft, `${player.name} は10捨てでカードを捨てませんでした`);
+        }
+      }
+
+      const updatedPlayer = draft.players[playerIndex];
+      completePlayerIfOutOfCards(draft, updatedPlayer);
+
+      draft.pendingEffects.splice(effectIndex, 1);
+      finalizeEffectState(draft, action.playerId);
+      return { state: draft, result: { ok: true } };
     }
-    const remaining = getEffectRemaining(effect);
-    if (remaining <= 0) {
+
+    case 'queenPurge': {
+      if (!isPlayableRank(action.rank)) {
+        return { state: draft, result: { ok: false, reason: '選択できないランクです' } };
+      }
+      const remaining = getEffectRemaining(effect);
+      if (remaining <= 0) {
       return { state: draft, result: { ok: false, reason: 'この効果は処理済みです' } };
     }
 
@@ -596,9 +602,11 @@ export const applyEffectAction = (
 
     finalizeEffectState(draft, action.playerId);
     return { state: draft, result: { ok: true } };
-  }
+    }
 
-  return { state: draft, result: { ok: false, reason: '未対応の効果です' } };
+    default:
+      return { state: draft, result: { ok: false, reason: '未対応の効果です' } };
+  }
 };
 
 export const applyEightCut = (state: GameState, playerId: PlayerId): GameState => {
