@@ -77,6 +77,7 @@ const RoomPage = () => {
   const [leaveLoading, setLeaveLoading] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<'connected' | 'reconnecting'>('connected');
   const [isInfoCollapsed, setIsInfoCollapsed] = useState(true);
+  const effectSignatureRef = useRef<string | null>(null);
   const queenEffectSignatureRef = useRef<string | null>(null);
 
   const roomCode = useMemo(() => (typeof params.code === 'string' ? params.code : params.code?.[0] ?? ''), [params.code]);
@@ -124,14 +125,26 @@ const RoomPage = () => {
     if (!activeEffect) {
       setEffectSelection([]);
       setEffectLoading(false);
+      effectSignatureRef.current = null;
       queenEffectSignatureRef.current = null;
       return;
     }
-    setEffectSelection([]);
+
+    const signature = JSON.stringify({
+      type: activeEffect.type,
+      payload: activeEffect.payload ?? null
+    });
+    const hasChanged = effectSignatureRef.current !== signature;
+    effectSignatureRef.current = signature;
+
+    if (hasChanged) {
+      setEffectSelection([]);
+    }
     setEffectLoading(false);
+
     if (activeEffect.type === 'queenPurge') {
       const declared = new Set(activeEffect.payload?.declaredRanks ?? []);
-      const signature = JSON.stringify({
+      const queenSignature = JSON.stringify({
         type: activeEffect.type,
         declared: activeEffect.payload?.declaredRanks ?? [],
         remaining:
@@ -142,11 +155,13 @@ const RoomPage = () => {
             : null
       });
       const currentValid = effectRank ? !declared.has(effectRank) : false;
-      if (!currentValid || queenEffectSignatureRef.current !== signature) {
+      if (!currentValid || queenEffectSignatureRef.current !== queenSignature) {
         const nextRank = queenRankOptions.find((option) => !declared.has(option)) ?? '3';
-        setEffectRank(nextRank);
+        if (nextRank !== effectRank) {
+          setEffectRank(nextRank);
+        }
       }
-      queenEffectSignatureRef.current = signature;
+      queenEffectSignatureRef.current = queenSignature;
     } else {
       queenEffectSignatureRef.current = null;
     }
