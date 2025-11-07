@@ -44,6 +44,33 @@ const countByRank = (cards: Card[], rank: Rank): number =>
 
 const countJokers = (cards: Card[]): number => countByRank(cards, 'Joker');
 
+const getNonJokerCards = (cards: Card[]): Card[] =>
+  cards.filter((card) => card.rank !== 'Joker');
+
+const isRevolutionPlay = (cards: Card[]): boolean => {
+  if (cards.length === 4) {
+    const [first, ...rest] = cards;
+    return rest.every((card) => card.rank === first.rank) && countJokers(cards) === 0;
+  }
+  if (cards.length === 5) {
+    const jokerCount = countJokers(cards);
+    if (jokerCount !== 1) {
+      return false;
+    }
+    const nonJokers = getNonJokerCards(cards);
+    if (nonJokers.length !== 4) {
+      return false;
+    }
+    const [first, ...rest] = nonJokers;
+    return rest.every((card) => card.rank === first.rank);
+  }
+  return false;
+};
+
+const syncStrengthReversalState = (state: GameState) => {
+  state.flags.strengthReversed = state.flags.revolutionActive !== state.flags.jackReversalActive;
+};
+
 const getEffectiveCountForRank = (cards: Card[], rank: Rank): number => {
   const rankCount = countByRank(cards, rank);
   if (rankCount === 0) {
@@ -131,6 +158,8 @@ export const createEmptyState = (roomCode: string): GameState => ({
   startingPlayer: null,
   flags: {
     strengthReversed: false,
+    revolutionActive: false,
+    jackReversalActive: false,
     rotationReversed: false,
     lockSuit: null,
     awaitingSpade3: false
@@ -237,20 +266,41 @@ const finalizeEffectState = (state: GameState, actorId: PlayerId) => {
 };
 
 const clearStrengthReversal = (state: GameState): GameState => {
-  if (!state.flags.strengthReversed) {
-    state.pendingEffects = state.pendingEffects.filter((effect) => effect.type !== 'jackReverse');
+  const hadJackEffect = state.flags.jackReversalActive;
+  state.flags.jackReversalActive = false;
+  state.pendingEffects = state.pendingEffects.filter((effect) => effect.type !== 'jackReverse');
+  syncStrengthReversalState(state);
+  if (!hadJackEffect) {
     return state;
   }
-  state.flags.strengthReversed = false;
-  state.pendingEffects = state.pendingEffects.filter((effect) => effect.type !== 'jackReverse');
-  appendLog(state, 'Jバックの効果が終了し、強さ順が通常に戻りました');
+  if (state.flags.revolutionActive) {
+    appendLog(state, 'Jバックの効果が終了し、革命状態に戻りました');
+  } else {
+    appendLog(state, 'Jバックの効果が終了し、強さ順が通常に戻りました');
+  }
+  return state;
+};
+
+const applyRevolution = (state: GameState, playerId: PlayerId): GameState => {
+  state.flags.revolutionActive = !state.flags.revolutionActive;
+  syncStrengthReversalState(state);
+  const player = state.players.find((item) => item.id === playerId);
+  const name = player?.name ?? '不明なプレイヤー';
+  if (state.flags.revolutionActive) {
+    appendLog(state, `${name} の革命！強さの順番が逆転しました`);
+  } else if (state.flags.strengthReversed) {
+    appendLog(state, `${name} が革命返しを起こしましたが、J効果により強さの順番は逆転中です`);
+  } else {
+    appendLog(state, `${name} が革命返しを起こし、強さの順番が通常に戻りました`);
+  }
   return state;
 };
 
 const registerEffects = (state: GameState, cards: Card[], playerId: PlayerId): boolean => {
   let keepTurn = false;
+  const revolutionTriggered = isRevolutionPlay(cards);
 
-  if (getEffectiveCountForRank(cards, 'J') > 0) {
+  if (!revolutionTriggered && getEffectiveCountForRank(cards, 'J') > 0) {
     state = applyJackReverseOrder(state, playerId);
   }
 
@@ -276,6 +326,10 @@ const registerEffects = (state: GameState, cards: Card[], playerId: PlayerId): b
 
   if (getEffectiveCountForRank(cards, '9') > 0) {
     state = applyNineReverseRotation(state, playerId);
+  }
+
+  if (revolutionTriggered) {
+    state = applyRevolution(state, playerId);
   }
 
   return keepTurn;
@@ -674,9 +728,13 @@ export const applySevenGive = (
 };
 
 export const applyJackReverseOrder = (state: GameState, playerId: PlayerId): GameState => {
-  state.flags.strengthReversed = !state.flags.strengthReversed;
+  state.flags.jackReversalActive = !state.flags.jackReversalActive;
+  syncStrengthReversalState(state);
   appendLog(state, `J効果：強さの順番が${state.flags.strengthReversed ? '逆転' : '通常'}になりました`);
-  state.pendingEffects.push({ type: 'jackReverse', payload: { playerId } });
+  state.pendingEffects = state.pendingEffects.filter((effect) => effect.type !== 'jackReverse');
+  if (state.flags.jackReversalActive) {
+    state.pendingEffects.push({ type: 'jackReverse', payload: { playerId } });
+  }
   return state;
 };
 
@@ -744,6 +802,8 @@ export const startGameIfReady = (state: GameState): GameState => {
   const { hands, starter } = dealCards(playerIds);
   state.flags = {
     strengthReversed: false,
+    revolutionActive: false,
+    jackReversalActive: false,
     rotationReversed: false,
     lockSuit: null,
     awaitingSpade3: false

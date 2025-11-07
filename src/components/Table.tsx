@@ -68,9 +68,28 @@ const Table = ({ state }: TableProps) => {
   const previousPlay = plays.previous;
   const getPlayerName = (playerId: string) =>
     state?.players.find((player) => player.id === playerId)?.name ?? '不明なプレイヤー';
+  const revolutionActive = state?.flags.revolutionActive ?? false;
+  const strengthReversed = state?.flags.strengthReversed ?? false;
+  const revolutionReversed = revolutionActive && strengthReversed;
+  const tableClassName = [
+    'table-display',
+    'table-display-round',
+    revolutionReversed ? 'table-display-revolution' : null
+  ]
+    .filter(Boolean)
+    .join(' ');
+  const strengthStatus = (() => {
+    if (!state) {
+      return '不明';
+    }
+    if (state.flags.strengthReversed) {
+      return state.flags.revolutionActive ? '逆転中（革命）' : '逆転中';
+    }
+    return state.flags.revolutionActive ? '通常（革命一時解除）' : '通常';
+  })();
 
   return (
-    <div className="table-display table-display-round">
+    <div className={tableClassName}>
       <div className="table-pile">
         <h3 className="table-title">現在の場</h3>
         {currentPlay ? (
@@ -118,7 +137,7 @@ const Table = ({ state }: TableProps) => {
         </div>
       ) : null}
       <div className="table-flags">
-        <span>強さ順: {state?.flags.strengthReversed ? '逆転中' : '通常'}</span>
+        <span>強さ順: {strengthStatus}</span>
         <span>順番: {state?.flags.rotationReversed ? '逆回り' : '通常'}</span>
         <span>
           縛り: {state?.flags.lockSuit ? `${suitIconMap[state.flags.lockSuit]}縛り` : 'なし'}

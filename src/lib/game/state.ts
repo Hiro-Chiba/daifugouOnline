@@ -11,11 +11,31 @@ export const parseState = (input: string | null | undefined, roomCode: string): 
       ...player,
       ready: Boolean(player.ready)
     }));
+    const base = createEmptyState(roomCode);
+    const pendingEffects = parsed.pendingEffects ?? [];
+    const hasJackReverseEffect = pendingEffects.some((effect) => effect.type === 'jackReverse');
+    const flags = {
+      ...base.flags,
+      ...(parsed.flags ?? {})
+    };
+    if (typeof parsed.flags?.jackReversalActive !== 'boolean') {
+      flags.jackReversalActive = hasJackReverseEffect;
+    }
+    if (typeof parsed.flags?.revolutionActive !== 'boolean') {
+      flags.revolutionActive = false;
+    }
+    flags.strengthReversed = flags.revolutionActive !== flags.jackReversalActive;
+    const table = {
+      ...base.table,
+      ...(parsed.table ?? {})
+    };
     return {
-      ...createEmptyState(roomCode),
+      ...base,
       ...parsed,
       players,
-      roomCode
+      roomCode,
+      flags,
+      table
     };
   } catch (error) {
     return createEmptyState(roomCode);
