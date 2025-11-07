@@ -1,7 +1,8 @@
 'use client';
 
 import Image from 'next/image';
-import type { Card, PublicState, Suit, Effect } from '@/lib/game/types';
+import { useEffect, useState } from 'react';
+import type { Card, PublicState, Suit, Effect, Play } from '@/lib/game/types';
 import { getCardImagePath, getCardLabel } from '@/lib/game/cardAssets';
 
 const describeCards = (cards: Card[]): string => cards.map(getCardLabel).join(' ');
@@ -46,25 +47,47 @@ interface TableProps {
 }
 
 const Table = ({ state }: TableProps) => {
-  const lastPlay = state?.table.lastPlay;
+  const [plays, setPlays] = useState<{ current: Play | null; previous: Play | null }>(
+    { current: null, previous: null }
+  );
+  const lastPlay = state?.table.lastPlay ?? null;
+
+  useEffect(() => {
+    setPlays((prev) => {
+      if (!lastPlay) {
+        return { current: null, previous: null };
+      }
+      if (prev.current && prev.current.timestamp === lastPlay.timestamp) {
+        return prev;
+      }
+      return { current: lastPlay, previous: prev.current ?? prev.previous ?? null };
+    });
+  }, [lastPlay]);
+
+  const currentPlay = plays.current;
+  const previousPlay = plays.previous;
+  const getPlayerName = (playerId: string) =>
+    state?.players.find((player) => player.id === playerId)?.name ?? '不明なプレイヤー';
+
   return (
-    <div className="table-display">
-      <h3 className="table-title">現在の場</h3>
+    <div className="table-display table-display-round">
       <div className="table-pile">
-        {lastPlay ? (
+        <h3 className="table-title">現在の場</h3>
+        {currentPlay ? (
           <>
             <p className="table-summary">
-              {lastPlay.cards.length}枚 [{describeCards(lastPlay.cards)}]
+              {getPlayerName(currentPlay.playerId)}が{currentPlay.cards.length}枚出しました
+              （{describeCards(currentPlay.cards)}）
             </p>
-            <div className="table-cards">
-              {lastPlay.cards.map((card) => (
+            <div className="table-cards table-cards-current">
+              {currentPlay.cards.map((card) => (
                 <Image
                   key={card.id}
                   src={getCardImagePath(card)}
                   alt={getCardLabel(card)}
                   width={96}
                   height={144}
-                  className="card-face table-card-face"
+                  className="card-face table-card-face table-card-face-current"
                 />
               ))}
             </div>
@@ -73,9 +96,33 @@ const Table = ({ state }: TableProps) => {
           <p className="table-summary">現在は場が流れています</p>
         )}
       </div>
+      {previousPlay ? (
+        <div className="table-previous">
+          <span className="table-subtitle">一つ前の手</span>
+          <p className="table-summary table-summary-muted">
+            {getPlayerName(previousPlay.playerId)}が{previousPlay.cards.length}枚出しました
+            （{describeCards(previousPlay.cards)}）
+          </p>
+          <div className="table-cards table-cards-previous">
+            {previousPlay.cards.map((card) => (
+              <Image
+                key={`${previousPlay.timestamp}-${card.id}`}
+                src={getCardImagePath(card)}
+                alt={getCardLabel(card)}
+                width={72}
+                height={108}
+                className="card-face table-card-face table-card-face-previous"
+              />
+            ))}
+          </div>
+        </div>
+      ) : null}
       <div className="table-flags">
         <span>強さ順: {state?.flags.strengthReversed ? '逆転中' : '通常'}</span>
         <span>順番: {state?.flags.rotationReversed ? '逆回り' : '通常'}</span>
+        <span>
+          縛り: {state?.flags.lockSuit ? `${suitIconMap[state.flags.lockSuit]}縛り` : 'なし'}
+        </span>
         {state?.flags.awaitingSpade3 ? (
           <span className="table-alert">ジョーカー待ち：♠3のみ返せます</span>
         ) : null}

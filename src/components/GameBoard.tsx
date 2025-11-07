@@ -70,22 +70,20 @@ const GameBoard = ({
   const connectionLabel = connectionStatus === 'connected' ? '良好' : '再接続中';
   return (
     <div className="game-board">
-      <div className="board-grid">
-        <section className="table-panel">
-          <div className="board-status">
-            <span className="badge">参加者: {players.length}人</span>
-            <span className={`badge badge-${connectionStatus}`}>接続: {connectionLabel}</span>
-          </div>
-          <div className="table-wrapper">
+      <div className="board-header">
+        <div className="board-status">
+          <span className="badge">参加者: {players.length}人</span>
+          <span className={`badge badge-${connectionStatus}`}>接続: {connectionLabel}</span>
+        </div>
+      </div>
+      <div className="round-table-section">
+        <div className="round-table-wrapper">
+          <div className="round-table-surface" />
+          <div className="round-table-center">
             <Table state={state} />
           </div>
-        </section>
-        <aside className="players-panel">
-          <div className="players-header">
-            <h3>参加者一覧</h3>
-          </div>
           <PlayerList players={players} currentTurn={state?.currentTurn ?? null} />
-        </aside>
+        </div>
       </div>
       <section className="hand-panel">
         <div className="hand-header">
