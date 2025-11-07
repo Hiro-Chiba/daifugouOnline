@@ -1,4 +1,12 @@
-import type { Card, GameState, PlayerId, Rank, Suit, ValidationResult } from './types';
+import type {
+  Card,
+  Effect,
+  GameState,
+  PlayerId,
+  Rank,
+  Suit,
+  ValidationResult
+} from './types';
 
 const baseOrder: Rank[] = ['3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A', '2'];
 
@@ -72,6 +80,33 @@ const compareCombination = (
   return challengerStrength - currentStrength;
 };
 
+const getEffectRemaining = (effect: Effect): number => {
+  if (!effect.payload) {
+    return 0;
+  }
+  if (typeof effect.payload.remaining === 'number') {
+    return effect.payload.remaining;
+  }
+  if (typeof effect.payload.count === 'number') {
+    return effect.payload.count;
+  }
+  return 0;
+};
+
+const hasBlockingEffect = (state: GameState, playerId: PlayerId): boolean =>
+  state.pendingEffects.some((effect) => {
+    if (!effect.payload || effect.payload.playerId !== playerId) {
+      return false;
+    }
+    if (effect.type === 'sevenGive' || effect.type === 'tenDiscard') {
+      return true;
+    }
+    if (effect.type === 'queenPurge') {
+      return getEffectRemaining(effect) > 0;
+    }
+    return false;
+  });
+
 export const canPlay = (state: GameState, userId: PlayerId, cards: Card[]): ValidationResult => {
   if (state.finished) {
     return { ok: false, reason: '対局は終了しています' };
@@ -82,6 +117,9 @@ export const canPlay = (state: GameState, userId: PlayerId, cards: Card[]): Vali
   const player = state.players.find((item) => item.id === userId);
   if (!player) {
     return { ok: false, reason: 'プレイヤーが見つかりません' };
+  }
+  if (hasBlockingEffect(state, userId)) {
+    return { ok: false, reason: '効果の処理を先に完了してください' };
   }
   if (player.finished) {
     return { ok: false, reason: '既にあがっています' };

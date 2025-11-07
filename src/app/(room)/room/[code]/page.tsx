@@ -4,9 +4,10 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import GameBoard from '@/components/GameBoard';
 import Toast from '@/components/Toast';
+import EffectModal from '@/components/EffectModal';
 import { getPusherClient } from '@/lib/pusher-client';
 import { MIN_PLAYERS, MAX_PLAYERS } from '@/lib/game/constants';
-import type { Card, PublicState } from '@/lib/game/types';
+import type { Card, PublicState, Rank, Effect } from '@/lib/game/types';
 import { clearSession, loadSession, saveSession } from '@/lib/session';
 
 interface SyncResponse {
@@ -45,6 +46,8 @@ const hydrateState = (state: PublicState, userId: string, handOverride?: Card[])
   })
 });
 
+const queenRankOptions: Rank[] = ['3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A', '2'];
+
 const RoomPage = () => {
   const params = useParams<{ code: string }>();
   const router = useRouter();
@@ -52,6 +55,9 @@ const RoomPage = () => {
   const [state, setState] = useState<PublicState | null>(null);
   const [hand, setHand] = useState<Card[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
+  const [effectSelection, setEffectSelection] = useState<string[]>([]);
+  const [effectRank, setEffectRank] = useState<Rank>('3');
+  const [effectLoading, setEffectLoading] = useState(false);
   const [messages, setMessages] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [startLoading, setStartLoading] = useState(false);
@@ -60,6 +66,37 @@ const RoomPage = () => {
   const [isInfoCollapsed, setIsInfoCollapsed] = useState(true);
 
   const roomCode = useMemo(() => (typeof params.code === 'string' ? params.code : params.code?.[0] ?? ''), [params.code]);
+
+  const activeEffect = useMemo<Effect | null>(() => {
+    if (!state || !session) {
+      return null;
+    }
+    return (
+      state.pendingEffects.find((effect) => {
+        if (!effect.payload || effect.payload.playerId !== session.userId) {
+          return false;
+        }
+        if (effect.type === 'sevenGive' || effect.type === 'tenDiscard') {
+          return true;
+        }
+        if (effect.type === 'queenPurge') {
+          const remaining =
+            typeof effect.payload.remaining === 'number'
+              ? effect.payload.remaining
+              : typeof effect.payload.count === 'number'
+              ? effect.payload.count
+              : 0;
+          return remaining > 0;
+        }
+        return false;
+      }) ?? null
+    );
+  }, [session, state]);
+
+  const effectLimit = useMemo(
+    () => (typeof activeEffect?.payload?.count === 'number' ? activeEffect.payload.count : 0),
+    [activeEffect]
+  );
 
   useEffect(() => {
     if (!session || session.roomCode !== roomCode) {
@@ -71,6 +108,25 @@ const RoomPage = () => {
       setSession(stored);
     }
   }, [roomCode, router, session]);
+
+  useEffect(() => {
+    if (!activeEffect) {
+      setEffectSelection([]);
+      setEffectLoading(false);
+      return;
+    }
+    setEffectSelection([]);
+    setEffectLoading(false);
+    if (activeEffect.type === 'queenPurge') {
+      const declared = new Set(activeEffect.payload?.declaredRanks ?? []);
+      const nextRank = queenRankOptions.find((option) => !declared.has(option)) ?? '3';
+      setEffectRank(nextRank);
+    }
+  }, [activeEffect]);
+
+  useEffect(() => {
+    setEffectSelection((prev) => prev.filter((id) => hand.some((card) => card.id === id)));
+  }, [hand]);
 
   const pushMessage = useCallback((message: string) => {
     setMessages((prev) => [...prev.slice(-2), message]);
@@ -90,6 +146,21 @@ const RoomPage = () => {
     [hand, session]
   );
 
+  const applyIncomingState = useCallback(
+    (incoming: PublicState) => {
+      if (!session) {
+        return;
+      }
+      const selfPlayer = incoming.players.find((player) => player.id === session.userId);
+      const nextHand = (selfPlayer?.hand ?? []) as Card[];
+      setHand(nextHand);
+      setSelected((prev) => prev.filter((id) => nextHand.some((card) => card.id === id)));
+      setEffectSelection((prev) => prev.filter((id) => nextHand.some((card) => card.id === id)));
+      updateState(incoming, nextHand);
+    },
+    [session, updateState]
+  );
+
   const syncState = useCallback(async () => {
     if (!session) {
       return;
@@ -105,15 +176,11 @@ const RoomPage = () => {
         return;
       }
       const data = (await response.json()) as SyncResponse;
-      const selfPlayer = data.state.players.find((player) => player.id === session.userId);
-      const nextHand = (selfPlayer?.hand ?? []) as Card[];
-      setHand(nextHand);
-      setSelected((prev) => prev.filter((id) => nextHand.some((card) => card.id === id)));
-      updateState(data.state, nextHand);
+      applyIncomingState(data.state);
     } catch (error) {
       pushMessage('通信エラーが発生しました');
     }
-  }, [pushMessage, roomCode, session, updateState]);
+  }, [applyIncomingState, pushMessage, roomCode, session]);
 
   useEffect(() => {
     if (!session) {
@@ -133,7 +200,7 @@ const RoomPage = () => {
     const channel = pusher.subscribe(channelName);
 
     const handleStateEvent = (payload: { state: PublicState; message?: string }) => {
-      updateState(payload.state);
+      applyIncomingState(payload.state);
       if (payload.message) {
         pushMessage(payload.message);
       }
@@ -141,24 +208,25 @@ const RoomPage = () => {
 
     channel.bind('play-card', handleStateEvent);
     channel.bind('pass', handleStateEvent);
+    channel.bind('effect', handleStateEvent);
     channel.bind('player-joined', (payload: { name: string; state: PublicState }) => {
-      updateState(payload.state);
+      applyIncomingState(payload.state);
       pushMessage(`${payload.name} さんが入室しました`);
     });
     channel.bind('player-left', (payload: { name: string; state?: PublicState }) => {
       if (payload.state) {
-        updateState(payload.state);
+        applyIncomingState(payload.state);
       }
       pushMessage(`${payload.name} さんが退室しました`);
     });
     channel.bind('system-message', (payload: { message: string; state?: PublicState }) => {
       if (payload.state) {
-        updateState(payload.state);
+        applyIncomingState(payload.state);
       }
       pushMessage(payload.message);
     });
     channel.bind('sync-state', (payload: { state: PublicState }) => {
-      updateState(payload.state);
+      applyIncomingState(payload.state);
     });
 
     const connection = pusher.connection;
@@ -170,11 +238,12 @@ const RoomPage = () => {
     return () => {
       channel.unbind('play-card', handleStateEvent);
       channel.unbind('pass', handleStateEvent);
+      channel.unbind('effect', handleStateEvent);
       channel.unbind_all();
       pusher.unsubscribe(channelName);
       connection.unbind('state_change', handleConnectionChange);
     };
-  }, [roomCode, session, updateState, pushMessage]);
+  }, [applyIncomingState, roomCode, session, pushMessage]);
 
   const toggleCard = useCallback(
     (cardId: string) => {
@@ -183,6 +252,29 @@ const RoomPage = () => {
       );
     },
     []
+  );
+
+  const handleEffectCardToggle = useCallback(
+    (cardId: string) => {
+      if (!activeEffect) {
+        return;
+      }
+      setEffectSelection((prev) => {
+        if (prev.includes(cardId)) {
+          return prev.filter((id) => id !== cardId);
+        }
+        if (activeEffect.type === 'queenPurge') {
+          return prev;
+        }
+        const limit =
+          typeof activeEffect.payload?.count === 'number' ? activeEffect.payload.count : 0;
+        if (limit > 0 && prev.length >= limit) {
+          return prev;
+        }
+        return [...prev, cardId];
+      });
+    },
+    [activeEffect]
   );
 
   const handlePlay = useCallback(async () => {
@@ -201,18 +293,16 @@ const RoomPage = () => {
         pushMessage(data.error ?? '出札に失敗しました');
         return;
       }
-      const selfPlayer = data.state.players.find((player) => player.id === session.userId);
-      const nextHand = (selfPlayer?.hand ?? []) as Card[];
-      setHand(nextHand);
+      applyIncomingState(data.state);
       setSelected([]);
-      updateState(data.state, nextHand);
+      setEffectSelection([]);
       saveSession({ ...session, roomCode });
     } catch (error) {
       pushMessage('通信エラーが発生しました');
     } finally {
       setLoading(false);
     }
-  }, [roomCode, session, selected, updateState, pushMessage]);
+  }, [applyIncomingState, pushMessage, roomCode, selected, session]);
 
   const handlePass = useCallback(async () => {
     if (!session) {
@@ -230,14 +320,14 @@ const RoomPage = () => {
         pushMessage(data.error ?? 'パスに失敗しました');
         return;
       }
-      updateState(data.state);
+      applyIncomingState(data.state);
       saveSession({ ...session, roomCode });
     } catch (error) {
       pushMessage('通信エラーが発生しました');
     } finally {
       setLoading(false);
     }
-  }, [roomCode, session, updateState, pushMessage]);
+  }, [applyIncomingState, pushMessage, roomCode, session]);
 
   const handleStartGame = useCallback(async () => {
     if (!session) {
@@ -255,18 +345,16 @@ const RoomPage = () => {
         pushMessage(data.error ?? 'ゲーム開始に失敗しました');
         return;
       }
-      const selfPlayer = data.state.players.find((player) => player.id === session.userId);
-      const nextHand = (selfPlayer?.hand ?? []) as Card[];
-      setHand(nextHand);
+      applyIncomingState(data.state);
       setSelected([]);
-      updateState(data.state, nextHand);
+      setEffectSelection([]);
       saveSession({ ...session, roomCode });
     } catch (error) {
       pushMessage('通信エラーが発生しました');
     } finally {
       setStartLoading(false);
     }
-  }, [roomCode, session, updateState, pushMessage]);
+  }, [applyIncomingState, pushMessage, roomCode, session]);
 
   const handleLeaveRoom = useCallback(async () => {
     if (!session) {
@@ -294,6 +382,49 @@ const RoomPage = () => {
       setLeaveLoading(false);
     }
   }, [roomCode, session, pushMessage, router]);
+
+  const handleEffectSubmit = useCallback(
+    async (options?: { skip?: boolean }) => {
+      if (!session || !activeEffect) {
+        return;
+      }
+      try {
+        setEffectLoading(true);
+        const payload: Record<string, unknown> = {
+          code: roomCode,
+          userId: session.userId,
+          type: activeEffect.type
+        };
+        if (activeEffect.type === 'sevenGive' || activeEffect.type === 'tenDiscard') {
+          const limit =
+            typeof activeEffect.payload?.count === 'number'
+              ? activeEffect.payload.count
+              : effectSelection.length;
+          const cards = options?.skip ? [] : effectSelection.slice(0, limit);
+          payload.cards = cards;
+        } else if (activeEffect.type === 'queenPurge') {
+          payload.rank = effectRank;
+        }
+        const response = await fetch('/api/effects', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = (await response.json()) as PlayResponse & { error?: string };
+        if (!response.ok) {
+          pushMessage(data.error ?? '効果の処理に失敗しました');
+          return;
+        }
+        applyIncomingState(data.state);
+        setEffectSelection([]);
+      } catch (error) {
+        pushMessage('通信エラーが発生しました');
+      } finally {
+        setEffectLoading(false);
+      }
+    },
+    [activeEffect, applyIncomingState, effectRank, effectSelection, pushMessage, roomCode, session]
+  );
 
   if (!session) {
     return null;
@@ -350,6 +481,24 @@ const RoomPage = () => {
         loading={loading}
         connectionStatus={connectionStatus}
       />
+      {activeEffect ? (
+        <EffectModal
+          effect={activeEffect}
+          hand={hand}
+          selected={effectSelection}
+          limit={effectLimit}
+          onToggleCard={handleEffectCardToggle}
+          onConfirm={() => handleEffectSubmit()}
+          onSkip={
+            activeEffect.payload?.optional
+              ? () => handleEffectSubmit({ skip: true })
+              : undefined
+          }
+          loading={effectLoading}
+          rank={effectRank}
+          onRankChange={setEffectRank}
+        />
+      ) : null}
       <Toast messages={messages} />
     </div>
   );

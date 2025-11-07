@@ -4,6 +4,8 @@ import { MIN_PLAYERS } from './constants';
 import { canPlay } from './validators';
 import type {
   Card,
+  EffectAction,
+  Effect,
   GamePlayer,
   GameState,
   PlayerId,
@@ -59,6 +61,33 @@ const getEffectiveCountForRank = (cards: Card[], rank: Rank): number => {
 
 const getNonJokerSuits = (cards: Card[]): Suit[] =>
   cards.filter((card) => card.suit !== 'joker').map((card) => card.suit as Suit);
+
+const getEffectRemaining = (effect: Effect): number => {
+  const payload = effect.payload;
+  if (!payload) {
+    return 0;
+  }
+  if (typeof payload.remaining === 'number') {
+    return payload.remaining;
+  }
+  if (typeof payload.count === 'number') {
+    return payload.count;
+  }
+  return 0;
+};
+
+const isBlockingEffectForPlayer = (effect: Effect, playerId: PlayerId): boolean => {
+  if (!effect.payload || effect.payload.playerId !== playerId) {
+    return false;
+  }
+  if (effect.type === 'sevenGive' || effect.type === 'tenDiscard') {
+    return true;
+  }
+  if (effect.type === 'queenPurge') {
+    return getEffectRemaining(effect) > 0;
+  }
+  return false;
+};
 
 const cloneState = (state: GameState): GameState => ({
   roomCode: state.roomCode,
@@ -171,6 +200,14 @@ const assignResultLabel = (state: GameState, playerId: PlayerId) => {
   player.result = label;
 };
 
+const completePlayerIfOutOfCards = (state: GameState, player: GamePlayer) => {
+  if (!player.finished && player.hand.length === 0) {
+    player.finished = true;
+    appendLog(state, `${player.name} があがりました！`);
+    assignResultLabel(state, player.id);
+  }
+};
+
 const checkForMatchEnd = (state: GameState) => {
   const remaining = state.players.filter((player) => !player.finished);
   if (remaining.length <= 1) {
@@ -181,6 +218,22 @@ const checkForMatchEnd = (state: GameState) => {
     state.currentTurn = null;
     appendLog(state, '対局が終了しました');
   }
+};
+
+const finalizeEffectState = (state: GameState, actorId: PlayerId) => {
+  checkForMatchEnd(state);
+  if (state.finished) {
+    state.currentTurn = null;
+    return;
+  }
+  const stillBlocking = state.pendingEffects.some((effect) =>
+    isBlockingEffectForPlayer(effect, actorId)
+  );
+  if (stillBlocking) {
+    state.currentTurn = actorId;
+    return;
+  }
+  state.currentTurn = calculateNextPlayer(state, actorId, false);
 };
 
 const registerEffects = (state: GameState, cards: Card[], playerId: PlayerId): boolean => {
@@ -310,18 +363,33 @@ export const applyPlay = (
 
   checkForMatchEnd(draft);
 
-  if (!draft.finished) {
-    draft.currentTurn = calculateNextPlayer(draft, userId, keepTurn);
-  } else {
+  if (draft.finished) {
     draft.currentTurn = null;
+  } else {
+    const hasBlockingEffect = draft.pendingEffects.some((effect) =>
+      isBlockingEffectForPlayer(effect, userId)
+    );
+    if (hasBlockingEffect) {
+      draft.currentTurn = userId;
+    } else {
+      draft.currentTurn = calculateNextPlayer(draft, userId, keepTurn);
+    }
   }
 
   return { state: draft, result: { ok: true } };
 };
 
+export const hasBlockingEffectForPlayer = (
+  state: GameState,
+  playerId: PlayerId
+): boolean => state.pendingEffects.some((effect) => isBlockingEffectForPlayer(effect, playerId));
+
 export const applyPass = (state: GameState, userId: PlayerId): GameState => {
   const draft = cloneState(state);
   if (draft.finished) {
+    return draft;
+  }
+  if (hasBlockingEffectForPlayer(draft, userId)) {
     return draft;
   }
   const player = draft.players.find((item) => item.id === userId);
@@ -353,6 +421,194 @@ export const applyPass = (state: GameState, userId: PlayerId): GameState => {
   return draft;
 };
 
+const findEffectIndexForAction = (state: GameState, action: EffectAction): number =>
+  state.pendingEffects.findIndex(
+    (effect) => effect.type === action.type && effect.payload?.playerId === action.playerId
+  );
+
+const extractCardsFromHand = (player: GamePlayer, cardIds: string[]): Card[] => {
+  const map = new Map(player.hand.map((card) => [card.id, card]));
+  const cards: Card[] = [];
+  for (const id of cardIds) {
+    const card = map.get(id);
+    if (!card) {
+      return [];
+    }
+    cards.push(card);
+  }
+  return cards;
+};
+
+const removeCardsById = (hand: Card[], cardIds: string[]): Card[] => {
+  const idSet = new Set(cardIds);
+  if (!idSet.size) {
+    return [...hand];
+  }
+  return hand.filter((card) => !idSet.has(card.id));
+};
+
+const isPlayableRank = (rank: Rank): boolean => rank !== 'Joker';
+
+export const applyEffectAction = (
+  state: GameState,
+  action: EffectAction
+): { state: GameState; result: ValidationResult } => {
+  const draft = cloneState(state);
+  if (draft.finished) {
+    return { state: draft, result: { ok: false, reason: '対局は終了しています' } };
+  }
+  if (draft.currentTurn !== action.playerId) {
+    return { state: draft, result: { ok: false, reason: '現在はあなたの処理順ではありません' } };
+  }
+
+  const playerIndex = draft.players.findIndex((item) => item.id === action.playerId);
+  if (playerIndex === -1) {
+    return { state: draft, result: { ok: false, reason: 'プレイヤーが見つかりません' } };
+  }
+  const player = draft.players[playerIndex];
+
+  const effectIndex = findEffectIndexForAction(draft, action);
+  if (effectIndex === -1) {
+    return { state: draft, result: { ok: false, reason: '処理すべき効果がありません' } };
+  }
+
+  const effect = draft.pendingEffects[effectIndex];
+
+  if (!isBlockingEffectForPlayer(effect, action.playerId) && effect.type !== 'queenPurge') {
+    return {
+      state: draft,
+      result: { ok: false, reason: 'この効果は処理済みです' }
+    };
+  }
+
+  if (effect.type !== action.type) {
+    return { state: draft, result: { ok: false, reason: '効果情報が一致しません' } };
+  }
+
+  switch (action.type) {
+    case 'sevenGive':
+    case 'tenDiscard': {
+      const limit = typeof effect.payload?.count === 'number' ? effect.payload.count : 0;
+      const uniqueIds = [...new Set(action.cards)];
+      if (uniqueIds.length !== action.cards.length) {
+        return {
+          state: draft,
+          result: { ok: false, reason: '同じカードを複数回選択することはできません' }
+        };
+      }
+      if (uniqueIds.length > limit) {
+        return {
+          state: draft,
+          result: { ok: false, reason: `最大${limit}枚まで選択できます` }
+        };
+      }
+      const cards = extractCardsFromHand(player, uniqueIds);
+      if (cards.length !== uniqueIds.length) {
+        return { state: draft, result: { ok: false, reason: '無効なカードが含まれています' } };
+      }
+      let targetIndex = -1;
+      if (action.type === 'sevenGive' && cards.length > 0) {
+        const targetId = calculateNextPlayer(draft, action.playerId, false);
+        if (!targetId) {
+          return {
+            state: draft,
+            result: { ok: false, reason: '渡せる相手がいません' }
+          };
+        }
+        targetIndex = draft.players.findIndex((item) => item.id === targetId);
+        if (targetIndex === -1) {
+          return {
+            state: draft,
+            result: { ok: false, reason: '渡せる相手がいません' }
+          };
+        }
+      }
+      draft.players[playerIndex] = {
+        ...player,
+        hand: removeCardsById(player.hand, uniqueIds),
+        hasPassed: false
+      };
+
+      if (action.type === 'sevenGive' && cards.length > 0) {
+        const receiver = draft.players[targetIndex];
+        draft.players[targetIndex] = {
+          ...receiver,
+          hand: [...receiver.hand, ...cards]
+        };
+        appendLog(draft, `${player.name} が7渡しで ${cards.length}枚を ${receiver.name} に渡しました`);
+      } else if (action.type === 'sevenGive') {
+        appendLog(draft, `${player.name} は7渡しでカードを渡しませんでした`);
+      }
+
+      if (action.type === 'tenDiscard') {
+        if (cards.length > 0) {
+          appendLog(draft, `${player.name} が10捨てで ${cards.length}枚捨てました`);
+        } else {
+          appendLog(draft, `${player.name} は10捨てでカードを捨てませんでした`);
+        }
+      }
+
+      const updatedPlayer = draft.players[playerIndex];
+      completePlayerIfOutOfCards(draft, updatedPlayer);
+
+      draft.pendingEffects.splice(effectIndex, 1);
+      finalizeEffectState(draft, action.playerId);
+      return { state: draft, result: { ok: true } };
+    }
+
+    case 'queenPurge': {
+      if (!isPlayableRank(action.rank)) {
+        return { state: draft, result: { ok: false, reason: '選択できないランクです' } };
+      }
+      const remaining = getEffectRemaining(effect);
+      if (remaining <= 0) {
+      return { state: draft, result: { ok: false, reason: 'この効果は処理済みです' } };
+    }
+
+    let removedTotal = 0;
+    draft.players = draft.players.map((p) => {
+      if (p.hand.length === 0) {
+        return p;
+      }
+      const removed = p.hand.filter((card) => card.rank === action.rank);
+      if (!removed.length) {
+        return p;
+      }
+      removedTotal += removed.length;
+      const nextPlayer = {
+        ...p,
+        hand: p.hand.filter((card) => card.rank !== action.rank)
+      };
+      completePlayerIfOutOfCards(draft, nextPlayer);
+      return nextPlayer;
+    });
+
+    const payload = effect.payload ?? {};
+    const nextRemaining = Math.max(0, remaining - 1);
+    payload.remaining = nextRemaining;
+    payload.declaredRanks = [...(payload.declaredRanks ?? []), action.rank];
+    effect.payload = payload;
+
+    appendLog(
+      draft,
+      `${player.name} がQボンバーで ${action.rank} を宣言し、${removedTotal}枚が捨てられました`
+    );
+
+    if (nextRemaining === 0) {
+      draft.pendingEffects.splice(effectIndex, 1);
+    } else {
+      draft.pendingEffects[effectIndex] = effect;
+    }
+
+    finalizeEffectState(draft, action.playerId);
+    return { state: draft, result: { ok: true } };
+    }
+
+    default:
+      return { state: draft, result: { ok: false, reason: '未対応の効果です' } };
+  }
+};
+
 export const applyEightCut = (state: GameState, playerId: PlayerId): GameState => {
   appendLog(state, '8切り！場が流れます');
   state.table.requiredCount = null;
@@ -372,7 +628,7 @@ export const applyTenDiscard = (
 ): GameState => {
   state.pendingEffects.push({
     type: 'tenDiscard',
-    payload: { playerId, count, optional: true }
+    payload: { playerId, count, optional: true, remaining: count }
   });
   appendLog(state, `10捨て：最大${count}枚まで任意のカードを捨てられます`);
   return state;
@@ -383,7 +639,10 @@ export const applyQueenPurge = (
   playerId: PlayerId,
   count: number
 ): GameState => {
-  state.pendingEffects.push({ type: 'queenPurge', payload: { playerId, count } });
+  state.pendingEffects.push({
+    type: 'queenPurge',
+    payload: { playerId, count, remaining: count, declaredRanks: [] }
+  });
   appendLog(state, `Qボンバー：宣言を${count}回行ってください`);
   return state;
 };
@@ -395,7 +654,7 @@ export const applySevenGive = (
 ): GameState => {
   state.pendingEffects.push({
     type: 'sevenGive',
-    payload: { playerId, count, optional: true }
+    payload: { playerId, count, optional: true, remaining: count }
   });
   appendLog(state, `7渡し：最大${count}枚まで任意のカードを渡せます`);
   return state;
