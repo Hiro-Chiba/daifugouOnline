@@ -22,6 +22,7 @@ const Hand = ({ cards, selected, onToggle }: HandProps) => (
           type="button"
           className={clsx('card-item', isSelected && 'selected')}
           onClick={() => onToggle(card.id)}
+          aria-pressed={isSelected}
         >
           <Image
             src={getCardImagePath(card)}

@@ -86,6 +86,7 @@ const EffectModal = ({
         ) : (
           <>
             <p className="effect-info">選択可能枚数: 0〜{limit}枚</p>
+            <p className="effect-info">現在の選択: {selected.length}枚</p>
             <Hand cards={hand} selected={selected} onToggle={onToggleCard} />
           </>
         )}
