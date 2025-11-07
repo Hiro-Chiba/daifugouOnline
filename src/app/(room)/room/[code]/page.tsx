@@ -442,9 +442,30 @@ const RoomPage = () => {
 
   const playersCount = state?.players.length ?? 0;
   const hasGameStarted = state?.players.some((player) => player.handCount > 0) ?? false;
-  const canStartGame = !hasGameStarted && playersCount >= MIN_PLAYERS;
+  const readyCount = state ? state.players.filter((player) => player.ready).length : 0;
+  const selfReady = state?.players.find((player) => player.id === session.userId)?.ready ?? false;
+  const canPressReady = !hasGameStarted && playersCount >= MIN_PLAYERS && !selfReady;
   const remainingPlayers = Math.max(0, MIN_PLAYERS - playersCount);
   const isRoomFull = playersCount >= MAX_PLAYERS;
+  const waitingReadyCount = Math.max(0, playersCount - readyCount);
+  const hints: string[] = [];
+  if (!hasGameStarted) {
+    if (playersCount < MIN_PLAYERS) {
+      hints.push(`ゲーム開始にはあと${remainingPlayers}人必要です`);
+    } else if (selfReady) {
+      hints.push(`他のプレイヤーの準備を待っています（残り${waitingReadyCount}人）`);
+    } else {
+      hints.push(`準備完了するとゲームが開始されます（現在${readyCount}/${playersCount}人が準備完了）`);
+    }
+    if (isRoomFull) {
+      hints.push(`ルームは満員です（最大${MAX_PLAYERS}人まで参加できます）`);
+    }
+  }
+  const startButtonLabel = startLoading
+    ? '送信中…'
+    : selfReady
+    ? '準備完了'
+    : 'ゲーム開始';
 
   return (
     <div className="room-page">
@@ -464,20 +485,20 @@ const RoomPage = () => {
         <div className="room-info-body">
           <p>プレイヤー名: {session.name}</p>
           <div className="room-info-actions">
-            <button type="button" onClick={handleStartGame} disabled={!canStartGame || startLoading}>
-              {startLoading ? '開始中…' : 'ゲーム開始'}
+            <button type="button" onClick={handleStartGame} disabled={!canPressReady || startLoading}>
+              {startButtonLabel}
             </button>
             <button type="button" onClick={handleLeaveRoom} disabled={leaveLoading}>
               {leaveLoading ? '退室中…' : 'ルームを退出'}
             </button>
           </div>
-          {!hasGameStarted ? (
-            playersCount < MIN_PLAYERS ? (
-              <small className="room-info-hint">ゲーム開始にはあと{remainingPlayers}人必要です</small>
-            ) : isRoomFull ? (
-              <small className="room-info-hint">ルームは満員です（最大{MAX_PLAYERS}人まで参加できます）</small>
-            ) : null
-          ) : null}
+          {!hasGameStarted
+            ? hints.map((hint, index) => (
+                <small key={`${hint}-${index}`} className="room-info-hint">
+                  {hint}
+                </small>
+              ))
+            : null}
         </div>
       </section>
       <GameBoard

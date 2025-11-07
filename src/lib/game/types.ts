@@ -32,6 +32,7 @@ export interface GamePlayer {
   finished: boolean;
   result?: string | null;
   hasPassed: boolean;
+  ready: boolean;
 }
 
 export interface Play {
@@ -100,6 +101,7 @@ export interface PublicPlayerState {
   result?: string | null;
   isSelf: boolean;
   hand?: Card[];
+  ready: boolean;
 }
 
 export interface PublicState {
