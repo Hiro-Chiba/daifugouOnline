@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import GameBoard from '@/components/GameBoard';
 import Toast from '@/components/Toast';
@@ -77,6 +77,7 @@ const RoomPage = () => {
   const [leaveLoading, setLeaveLoading] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<'connected' | 'reconnecting'>('connected');
   const [isInfoCollapsed, setIsInfoCollapsed] = useState(true);
+  const queenEffectSignatureRef = useRef<string | null>(null);
 
   const roomCode = useMemo(() => (typeof params.code === 'string' ? params.code : params.code?.[0] ?? ''), [params.code]);
 
@@ -123,16 +124,33 @@ const RoomPage = () => {
     if (!activeEffect) {
       setEffectSelection([]);
       setEffectLoading(false);
+      queenEffectSignatureRef.current = null;
       return;
     }
     setEffectSelection([]);
     setEffectLoading(false);
     if (activeEffect.type === 'queenPurge') {
       const declared = new Set(activeEffect.payload?.declaredRanks ?? []);
-      const nextRank = queenRankOptions.find((option) => !declared.has(option)) ?? '3';
-      setEffectRank(nextRank);
+      const signature = JSON.stringify({
+        type: activeEffect.type,
+        declared: activeEffect.payload?.declaredRanks ?? [],
+        remaining:
+          typeof activeEffect.payload?.remaining === 'number'
+            ? activeEffect.payload?.remaining
+            : typeof activeEffect.payload?.count === 'number'
+            ? activeEffect.payload?.count
+            : null
+      });
+      const currentValid = effectRank ? !declared.has(effectRank) : false;
+      if (!currentValid || queenEffectSignatureRef.current !== signature) {
+        const nextRank = queenRankOptions.find((option) => !declared.has(option)) ?? '3';
+        setEffectRank(nextRank);
+      }
+      queenEffectSignatureRef.current = signature;
+    } else {
+      queenEffectSignatureRef.current = null;
     }
-  }, [activeEffect]);
+  }, [activeEffect, effectRank]);
 
   useEffect(() => {
     setEffectSelection((prev) => prev.filter((id) => hand.some((card) => card.id === id)));
