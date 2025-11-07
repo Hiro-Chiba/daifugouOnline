@@ -1,6 +1,7 @@
 'use client';
 
 import clsx from 'clsx';
+import type { CSSProperties } from 'react';
 import type { PublicPlayerState } from '@/lib/game/types';
 
 interface PlayerListProps {
@@ -9,34 +10,40 @@ interface PlayerListProps {
 }
 
 const PlayerList = ({ players, currentTurn }: PlayerListProps) => {
+  const count = players.length || 1;
   return (
-    <ul className="player-list">
-      {players.map((player) => {
+    <div className="player-circle">
+      {players.map((player, index) => {
         const isActive = currentTurn === player.id && !player.finished;
+        const angle = (index / count) * 2 * Math.PI - Math.PI / 2;
+        const radius = 42;
+        const position: CSSProperties = {
+          left: `${50 + radius * Math.cos(angle)}%`,
+          top: `${50 + radius * Math.sin(angle)}%`
+        };
         return (
-          <li
+          <div
             key={player.id}
             className={clsx(
-              'player-list-item',
-              isActive && 'player-list-item-active',
-              player.isSelf && 'player-list-item-self',
-              player.finished && 'player-list-item-finished'
+              'player-seat',
+              isActive && 'player-seat-active',
+              player.isSelf && 'player-seat-self',
+              player.finished && 'player-seat-finished'
             )}
+            style={position}
           >
-            <div className="player-list-main">
-              <span className="player-list-seat">席{player.seat}</span>
-              <span className="player-list-name">
-                {player.name}
-                {player.isSelf ? '（あなた）' : ''}
-              </span>
-            </div>
-            <div className="player-list-meta">
+            <span className="player-seat-badge">席{player.seat}</span>
+            <span className="player-seat-name">
+              {player.name}
+              {player.isSelf ? '（あなた）' : ''}
+            </span>
+            <span className="player-seat-meta">
               {player.finished ? player.result ?? '上がり' : `手札: ${player.handCount}枚`}
-            </div>
-          </li>
+            </span>
+          </div>
         );
       })}
-    </ul>
+    </div>
   );
 };
 
