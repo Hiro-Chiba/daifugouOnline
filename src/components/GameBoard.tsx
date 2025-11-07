@@ -1,10 +1,13 @@
 'use client';
 
+import clsx from 'clsx';
+
 import PlayerList from './PlayerList';
 import Table from './Table';
 import Hand from './Hand';
 import Controls from './Controls';
 import type { Card, PublicState } from '@/lib/game/types';
+import type { HandSortMode } from '@/lib/game/sort';
 
 interface GameBoardProps {
   state: PublicState | null;
@@ -12,6 +15,9 @@ interface GameBoardProps {
   hand: Card[];
   selected: string[];
   onToggle: (cardId: string) => void;
+  onSortByStrength: () => void;
+  onSortBySuit: () => void;
+  sortMode: HandSortMode;
   onPlay: () => void;
   onPass: () => void;
   loading: boolean;
@@ -27,7 +33,10 @@ const GameBoard = ({
   onPlay,
   onPass,
   loading,
-  connectionStatus
+  connectionStatus,
+  onSortByStrength,
+  onSortBySuit,
+  sortMode
 }: GameBoardProps) => {
   const players = state?.players ?? [];
   const selfPlayer = players.find((player) => player.id === selfPlayerId);
@@ -89,6 +98,24 @@ const GameBoard = ({
         <div className="hand-header">
           <h3>あなたの手札</h3>
           {selfPlayer ? <span className="hand-count">残り {selfPlayer.handCount}枚</span> : null}
+        </div>
+        <div className="hand-actions" role="group" aria-label="手札の整列">
+          <button
+            type="button"
+            className={clsx('hand-action-button', sortMode === 'strength' && 'hand-action-button-active')}
+            onClick={onSortByStrength}
+            aria-pressed={sortMode === 'strength'}
+          >
+            強さ順に整理
+          </button>
+          <button
+            type="button"
+            className={clsx('hand-action-button', sortMode === 'suit' && 'hand-action-button-active')}
+            onClick={onSortBySuit}
+            aria-pressed={sortMode === 'suit'}
+          >
+            スートごとに整理
+          </button>
         </div>
         <Hand cards={hand} selected={selected} onToggle={onToggle} />
         <Controls

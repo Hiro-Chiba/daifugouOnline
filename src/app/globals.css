@@ -407,6 +407,40 @@ select {
   gap: 12px;
 }
 
+.hand-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.hand-action-button {
+  background: rgba(56, 89, 243, 0.1);
+  color: #1b2a66;
+  padding: 8px 14px;
+  font-size: 14px;
+  border: 1px solid rgba(74, 104, 255, 0.35);
+  border-radius: 999px;
+  transition: background 0.15s ease, box-shadow 0.15s ease;
+}
+
+.hand-action-button:not(:disabled):hover {
+  background: rgba(56, 89, 243, 0.22);
+  box-shadow: 0 6px 12px rgba(34, 60, 190, 0.2);
+}
+
+.hand-action-button:focus-visible {
+  outline: 2px solid rgba(74, 104, 255, 0.65);
+  outline-offset: 2px;
+}
+
+.hand-action-button-active {
+  background: linear-gradient(135deg, #3a5cff, #7c8cff);
+  color: #f7f9ff;
+  border-color: transparent;
+  box-shadow: 0 8px 18px rgba(38, 92, 255, 0.35);
+}
+
 .hand-count {
   font-size: 13px;
   color: rgba(32, 42, 82, 0.75);
