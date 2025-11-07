@@ -1,7 +1,7 @@
 'use client';
 
 import Image from 'next/image';
-import type { Card, PublicState, Suit } from '@/lib/game/types';
+import type { Card, PublicState, Suit, Effect } from '@/lib/game/types';
 import { getCardImagePath, getCardLabel } from '@/lib/game/cardAssets';
 
 const describeCards = (cards: Card[]): string => cards.map(getCardLabel).join(' ');
@@ -11,6 +11,34 @@ const suitIconMap: Record<Suit, string> = {
   diamonds: '♦',
   hearts: '♥',
   spades: '♠'
+};
+
+const effectLabelMap: Record<Effect['type'], string> = {
+  sevenGive: '7渡し',
+  tenDiscard: '10捨て',
+  queenPurge: 'Qボンバー',
+  eightCut: '8切り',
+  jackReverse: 'Jバック',
+  jokerCounter: '♠3返し',
+  nineReverse: '9リバース'
+};
+
+const describeEffect = (effect: Effect): string => {
+  const base = effectLabelMap[effect.type] ?? effect.type;
+  if (effect.type === 'sevenGive' || effect.type === 'tenDiscard') {
+    const count = typeof effect.payload?.count === 'number' ? effect.payload.count : 0;
+    return count > 0 ? `${base} (${count}枚)` : base;
+  }
+  if (effect.type === 'queenPurge') {
+    const remaining =
+      typeof effect.payload?.remaining === 'number'
+        ? effect.payload.remaining
+        : typeof effect.payload?.count === 'number'
+        ? effect.payload.count
+        : 0;
+    return remaining > 0 ? `${base} 残り${remaining}` : base;
+  }
+  return base;
 };
 
 interface TableProps {
@@ -56,7 +84,7 @@ const Table = ({ state }: TableProps) => {
         <div className="table-effects">
           {state.pendingEffects.map((effect, index) => (
             <span className="table-effect-chip" key={`${effect.type}-${index}`}>
-              {effect.type}
+              {describeEffect(effect)}
             </span>
           ))}
         </div>

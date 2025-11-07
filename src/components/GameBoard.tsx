@@ -37,10 +37,31 @@ const GameBoard = ({
     .map((cardId) => cardMap.get(cardId))
     .filter((card): card is Card => Boolean(card));
   const uniqueRanks = new Set(selectionCards.map((card) => card.rank));
+  const effectLock =
+    state?.pendingEffects.some((effect) => {
+      if (!effect.payload || effect.payload.playerId !== selfPlayerId) {
+        return false;
+      }
+      if (effect.type === 'sevenGive' || effect.type === 'tenDiscard') {
+        return true;
+      }
+      if (effect.type === 'queenPurge') {
+        const remaining =
+          typeof effect.payload.remaining === 'number'
+            ? effect.payload.remaining
+            : typeof effect.payload.count === 'number'
+            ? effect.payload.count
+            : 0;
+        return remaining > 0;
+      }
+      return false;
+    }) ?? false;
   const canPlay =
     selectionCards.length === selected.length &&
     selectionCards.length > 0 &&
-    (uniqueRanks.size === 1 || (selectionCards.length === 1 && selectionCards[0]?.rank === 'Joker'));
+    (uniqueRanks.size === 1 || (selectionCards.length === 1 && selectionCards[0]?.rank === 'Joker')) &&
+    !effectLock;
+  const canPass = !effectLock;
   const statusMessage = state?.finished
     ? '対局は終了しました'
     : connectionStatus === 'reconnecting'
@@ -79,6 +100,7 @@ const GameBoard = ({
           onPass={onPass}
           loading={loading}
           statusMessage={statusMessage}
+          canPass={canPass}
         />
       </section>
     </div>

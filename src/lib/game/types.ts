@@ -63,9 +63,17 @@ export type EffectType =
   | 'jokerCounter'
   | 'nineReverse';
 
+export interface EffectPayload {
+  playerId?: PlayerId;
+  count?: number;
+  optional?: boolean;
+  remaining?: number;
+  declaredRanks?: Rank[];
+}
+
 export interface Effect {
   type: EffectType;
-  payload?: Record<string, unknown>;
+  payload?: EffectPayload;
 }
 
 export interface GameState {
@@ -103,6 +111,11 @@ export interface PublicState {
   pendingEffects: Effect[];
   finished: boolean;
 }
+
+export type EffectAction =
+  | { type: 'sevenGive'; playerId: PlayerId; cards: string[] }
+  | { type: 'tenDiscard'; playerId: PlayerId; cards: string[] }
+  | { type: 'queenPurge'; playerId: PlayerId; rank: Rank };
 
 export interface ValidationSuccess {
   ok: true;

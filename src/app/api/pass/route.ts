@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { getPrismaClient } from '@/lib/db';
 import { cleanupStaleRooms } from '@/lib/cleanup';
 import { pusherServer } from '@/lib/pusher-server';
-import { applyPass, syncForClient } from '@/lib/game/engine';
+import { applyPass, hasBlockingEffectForPlayer, syncForClient } from '@/lib/game/engine';
 import { parseState, serializeState } from '@/lib/game/state';
 
 interface PassRequestBody {
@@ -26,6 +26,9 @@ export async function POST(request: Request) {
   const state = parseState(room.stateJson, room.code);
   if (state.currentTurn !== body.userId) {
     return NextResponse.json({ error: '現在はあなたの手番ではありません' }, { status: 400 });
+  }
+  if (hasBlockingEffectForPlayer(state, body.userId)) {
+    return NextResponse.json({ error: '効果の処理が完了していません' }, { status: 400 });
   }
 
   const updatedState = applyPass(state, body.userId);
