@@ -448,8 +448,8 @@ const RoomPage = () => {
       return undefined;
     }
     const selectedCount = selected.length;
-    const maxCount = state.activeEffect.maxCount;
     if (state.activeEffect.type === 'tenDiscard') {
+      const maxCount = state.activeEffect.maxCount;
       return {
         type: 'tenDiscard',
         maxCount,
@@ -462,6 +462,7 @@ const RoomPage = () => {
       };
     }
     if (state.activeEffect.type === 'sevenGive') {
+      const maxCount = state.activeEffect.maxCount;
       const targetOptions = state.players
         .filter((player) => player.id !== session.userId && !player.finished)
         .map((player) => ({ id: player.id, name: player.name }));
