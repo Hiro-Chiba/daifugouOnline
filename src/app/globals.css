@@ -955,3 +955,139 @@ select {
     gap: 16px;
   }
 }
+
+.solo-link-card {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.solo-link-card p {
+  margin: 0;
+  color: rgba(224, 232, 255, 0.78);
+}
+
+.solo-link-button {
+  width: 100%;
+  background: linear-gradient(135deg, #2f87ff, #6d9dff);
+}
+
+.solo-container {
+  width: min(100%, 1120px);
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding-bottom: 48px;
+}
+
+.solo-setup-card {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  align-items: stretch;
+  text-align: center;
+}
+
+.solo-title {
+  margin: 0;
+  font-size: 26px;
+}
+
+.solo-description {
+  margin: 0;
+  color: rgba(221, 230, 255, 0.78);
+  font-size: 15px;
+}
+
+.solo-form {
+  display: grid;
+  gap: 12px;
+}
+
+.solo-label {
+  text-align: left;
+  font-weight: 600;
+  font-size: 14px;
+  color: rgba(230, 236, 255, 0.85);
+}
+
+.solo-input {
+  font-size: 16px;
+}
+
+.solo-start-button {
+  width: 100%;
+}
+
+.solo-content {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.solo-opponents {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.solo-opponents h2 {
+  margin: 0;
+}
+
+.solo-opponents ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.solo-opponents li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: rgba(22, 34, 74, 0.6);
+  border: 1px solid rgba(122, 150, 255, 0.18);
+}
+
+.solo-opponent-name {
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.solo-opponent-type {
+  font-size: 14px;
+  color: rgba(220, 231, 255, 0.72);
+}
+
+.solo-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.solo-rematch-button {
+  background: linear-gradient(135deg, #337bff, #5b9dff);
+}
+
+.solo-exit-button {
+  background: linear-gradient(135deg, #ff5b76, #ff7b91);
+  color: #fff0f4;
+}
+
+.solo-exit-button:not(:disabled):hover {
+  box-shadow: 0 10px 22px rgba(255, 123, 145, 0.28);
+}
+
+@media (max-width: 900px) {
+  .solo-container {
+    width: min(100%, 95vw);
+  }
+}
