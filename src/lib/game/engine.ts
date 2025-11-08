@@ -331,8 +331,9 @@ const registerEffects = (state: GameState, cards: Card[], playerId: PlayerId): b
     state = applySevenGive(state, playerId, sevenCount);
   }
 
-  if (getEffectiveCountForRank(cards, '9') > 0) {
-    state = applyNineReverseRotation(state, playerId);
+  const nineCount = countByRank(cards, '9');
+  if (nineCount > 0) {
+    state = applyNineReverseRotation(state, playerId, nineCount);
   }
 
   if (revolutionTriggered) {
@@ -766,10 +767,26 @@ export const applyJokerCounterBySpade3 = (state: GameState, playerId: PlayerId):
   return state;
 };
 
-export const applyNineReverseRotation = (state: GameState, playerId: PlayerId): GameState => {
-  state.flags.rotationReversed = !state.flags.rotationReversed;
-  appendLog(state, `9の効果：順番が${state.flags.rotationReversed ? '逆回り' : '通常回り'}になりました`);
-  state.pendingEffects.push({ type: 'nineReverse', payload: { playerId } });
+export const applyNineReverseRotation = (
+  state: GameState,
+  playerId: PlayerId,
+  count = 1
+): GameState => {
+  if (count <= 0) {
+    return state;
+  }
+  const wasReversed = state.flags.rotationReversed;
+  if (count % 2 === 1) {
+    state.flags.rotationReversed = !state.flags.rotationReversed;
+  }
+  const cardLabel = count === 1 ? '9' : `${count}枚の9`;
+  const directionLabel = state.flags.rotationReversed ? '逆回り' : '通常回り';
+  if (wasReversed === state.flags.rotationReversed) {
+    appendLog(state, `${cardLabel}の効果：順番は変わらず${directionLabel}のままです`);
+  } else {
+    appendLog(state, `${cardLabel}の効果：順番が${directionLabel}になりました`);
+  }
+  state.pendingEffects.push({ type: 'nineReverse', payload: { playerId, count } });
   return state;
 };
 
