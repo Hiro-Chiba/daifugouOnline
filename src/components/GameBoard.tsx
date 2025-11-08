@@ -113,7 +113,7 @@ const GameBoard = ({
               <circle className="turn-direction-ring" cx="100" cy="100" r="88" />
               <path
                 className="turn-direction-arrow"
-                d="M100 24 A76 76 0 1 1 99.99 24 M100 24 L112 42 M100 24 L88 42"
+                d="M100 24 A76 76 0 1 1 99.99 24 M100 24 L120 18 M100 24 L120 30"
               />
             </svg>
           </div>
