@@ -135,7 +135,10 @@ const cloneState = (state: GameState): GameState => ({
       : null,
     requiredCount: state.table.requiredCount,
     pile: [...state.table.pile],
-    logs: [...state.table.logs]
+    logs: [...state.table.logs],
+    queenPurgeResult: state.table.queenPurgeResult
+      ? { ...state.table.queenPurgeResult }
+      : null
   },
   pendingEffects: state.pendingEffects.map((effect) => ({
     type: effect.type,
@@ -168,7 +171,8 @@ export const createEmptyState = (roomCode: string): GameState => ({
     lastPlay: null,
     requiredCount: null,
     pile: [],
-    logs: []
+    logs: [],
+    queenPurgeResult: null
   },
   pendingEffects: [],
   turnHistory: [],
@@ -631,46 +635,53 @@ export const applyEffectAction = (
       }
       const remaining = getEffectRemaining(effect);
       if (remaining <= 0) {
-      return { state: draft, result: { ok: false, reason: 'この効果は処理済みです' } };
-    }
+        return { state: draft, result: { ok: false, reason: 'この効果は処理済みです' } };
+      }
 
-    let removedTotal = 0;
-    draft.players = draft.players.map((p) => {
-      if (p.hand.length === 0) {
-        return p;
-      }
-      const removed = p.hand.filter((card) => card.rank === action.rank);
-      if (!removed.length) {
-        return p;
-      }
-      removedTotal += removed.length;
-      const nextPlayer = {
-        ...p,
-        hand: p.hand.filter((card) => card.rank !== action.rank)
+      let removedTotal = 0;
+      draft.players = draft.players.map((p) => {
+        if (p.hand.length === 0) {
+          return p;
+        }
+        const removed = p.hand.filter((card) => card.rank === action.rank);
+        if (!removed.length) {
+          return p;
+        }
+        removedTotal += removed.length;
+        const nextPlayer = {
+          ...p,
+          hand: p.hand.filter((card) => card.rank !== action.rank)
+        };
+        completePlayerIfOutOfCards(draft, nextPlayer);
+        return nextPlayer;
+      });
+
+      const payload = effect.payload ?? {};
+      const nextRemaining = Math.max(0, remaining - 1);
+      payload.remaining = nextRemaining;
+      payload.declaredRanks = [...(payload.declaredRanks ?? []), action.rank];
+      effect.payload = payload;
+
+      appendLog(
+        draft,
+        `${player.name} がQボンバーで ${action.rank} を宣言し、${removedTotal}枚が捨てられました`
+      );
+
+      draft.table.queenPurgeResult = {
+        rank: action.rank,
+        count: removedTotal,
+        playerId: action.playerId,
+        timestamp: new Date().toISOString()
       };
-      completePlayerIfOutOfCards(draft, nextPlayer);
-      return nextPlayer;
-    });
 
-    const payload = effect.payload ?? {};
-    const nextRemaining = Math.max(0, remaining - 1);
-    payload.remaining = nextRemaining;
-    payload.declaredRanks = [...(payload.declaredRanks ?? []), action.rank];
-    effect.payload = payload;
+      if (nextRemaining === 0) {
+        draft.pendingEffects.splice(effectIndex, 1);
+      } else {
+        draft.pendingEffects[effectIndex] = effect;
+      }
 
-    appendLog(
-      draft,
-      `${player.name} がQボンバーで ${action.rank} を宣言し、${removedTotal}枚が捨てられました`
-    );
-
-    if (nextRemaining === 0) {
-      draft.pendingEffects.splice(effectIndex, 1);
-    } else {
-      draft.pendingEffects[effectIndex] = effect;
-    }
-
-    finalizeEffectState(draft, action.playerId);
-    return { state: draft, result: { ok: true } };
+      finalizeEffectState(draft, action.playerId);
+      return { state: draft, result: { ok: true } };
     }
 
     default:
@@ -782,7 +793,8 @@ export const syncForClient = (state: GameState, viewerId: PlayerId): PublicState
     lastPlay: state.table.lastPlay,
     requiredCount: state.table.requiredCount,
     pile: state.table.pile,
-    logs: state.table.logs
+    logs: state.table.logs,
+    queenPurgeResult: state.table.queenPurgeResult ?? null
   },
   pendingEffects: state.pendingEffects,
   finished: state.finished
@@ -815,7 +827,8 @@ export const startGameIfReady = (state: GameState): GameState => {
     lastPlay: null,
     requiredCount: null,
     pile: [],
-    logs: []
+    logs: [],
+    queenPurgeResult: null
   };
   state.pendingEffects = [];
   state.turnHistory = [];

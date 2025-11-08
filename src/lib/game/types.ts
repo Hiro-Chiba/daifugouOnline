@@ -46,6 +46,14 @@ export interface TableState {
   requiredCount: number | null;
   pile: Card[];
   logs: string[];
+  queenPurgeResult: QueenPurgeResult | null;
+}
+
+export interface QueenPurgeResult {
+  rank: Rank;
+  count: number;
+  playerId: PlayerId;
+  timestamp: string;
 }
 
 export interface Flags {
