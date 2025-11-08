@@ -316,10 +316,14 @@ const SoloPage = () => {
       let action: EffectAction;
       if (activeEffect.type === 'queenPurge') {
         action = { type: 'queenPurge', playerId: HUMAN_PLAYER_ID, rank: effectRank };
-      } else {
+      } else if (activeEffect.type === 'sevenGive' || activeEffect.type === 'tenDiscard') {
         const limit = effectLimit > 0 ? effectLimit : effectSelection.length;
         const cards = options?.skip ? [] : effectSelection.slice(0, limit);
         action = { type: activeEffect.type, playerId: HUMAN_PLAYER_ID, cards };
+      } else {
+        pushMessage('この効果には対応できません');
+        setEffectLoading(false);
+        return;
       }
       const { state: nextState, result } = applyEffectAction(gameState, action);
       if (!result.ok) {
