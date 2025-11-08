@@ -70,6 +70,13 @@ const HomePage = () => {
       <section className="form-card landing-hero">
         <h1>大富豪オンライン</h1>
       </section>
+      <section className="form-card solo-link-card">
+        <h2>一人対戦モード</h2>
+        <p>MBTIベースの16体のNPCから3体が選ばれ、あなたに挑みます。</p>
+        <button type="button" className="solo-link-button" onClick={() => router.push('/solo')}>
+          一人対戦を始める
+        </button>
+      </section>
       <JoinForm mode="create" onSubmit={handleCreate} />
       <JoinForm mode="join" onSubmit={handleJoin} />
       <Toast messages={messages} />
