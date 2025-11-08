@@ -1,7 +1,7 @@
 'use client';
 
 import Image from 'next/image';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Card, PublicState, Suit, Effect, Play, QueenPurgeResult } from '@/lib/game/types';
 import { getCardImagePath, getCardLabel } from '@/lib/game/cardAssets';
 
@@ -23,6 +23,9 @@ const effectLabelMap: Record<Effect['type'], string> = {
   jokerCounter: '♠3返し',
   nineReverse: '9リバース'
 };
+
+const getEffectKey = (effect: Effect): string =>
+  `${effect.type}:${JSON.stringify(effect.payload ?? {})}`;
 
 const describeEffect = (effect: Effect): string => {
   const base = effectLabelMap[effect.type] ?? effect.type;
@@ -51,6 +54,9 @@ const Table = ({ state }: TableProps) => {
     { current: null, previous: null }
   );
   const [queenResult, setQueenResult] = useState<QueenPurgeResult | null>(null);
+  const [visibleEffects, setVisibleEffects] = useState<Effect[]>([]);
+  const effectTimerRef = useRef<number | null>(null);
+  const previousEffectsRef = useRef<Effect[]>([]);
   const lastPlay = state?.table.lastPlay ?? null;
   const latestQueenResult = state?.table.queenPurgeResult ?? null;
   const queenPlayerId = latestQueenResult?.playerId ?? null;
@@ -87,6 +93,45 @@ const Table = ({ state }: TableProps) => {
     }, 5000);
     return () => window.clearTimeout(timer);
   }, [queenPlayerId, queenRank, queenCount, queenTimestamp]);
+
+  useEffect(() => {
+    const effects = state?.pendingEffects ?? [];
+    const previousEffects = previousEffectsRef.current;
+    const previousKeys = new Set(previousEffects.map(getEffectKey));
+    const newEffects = effects.filter((effect) => !previousKeys.has(getEffectKey(effect)));
+
+    if (newEffects.length > 0) {
+      setVisibleEffects(newEffects);
+      if (effectTimerRef.current !== null) {
+        window.clearTimeout(effectTimerRef.current);
+      }
+      effectTimerRef.current = window.setTimeout(() => {
+        setVisibleEffects([]);
+        effectTimerRef.current = null;
+      }, 4000);
+    } else if (effects.length === 0 && newEffects.length === 0 && previousEffects.length > 0) {
+      // 効果が全て解消された場合は表示もクリアする
+      if (effectTimerRef.current !== null) {
+        window.clearTimeout(effectTimerRef.current);
+        effectTimerRef.current = null;
+      }
+      setVisibleEffects([]);
+    }
+
+    previousEffectsRef.current = effects.map((effect) => ({
+      type: effect.type,
+      payload: effect.payload ? { ...effect.payload } : undefined
+    }));
+  }, [state?.pendingEffects]);
+
+  useEffect(
+    () => () => {
+      if (effectTimerRef.current !== null) {
+        window.clearTimeout(effectTimerRef.current);
+      }
+    },
+    []
+  );
 
   const currentPlay = plays.current;
   const previousPlay = plays.previous;
@@ -178,10 +223,10 @@ const Table = ({ state }: TableProps) => {
           </span>
         </div>
       ) : null}
-      {state?.pendingEffects.length ? (
+      {visibleEffects.length ? (
         <div className="table-effects">
-          {state.pendingEffects.map((effect, index) => (
-            <span className="table-effect-chip" key={`${effect.type}-${index}`}>
+          {visibleEffects.map((effect, index) => (
+            <span className="table-effect-chip" key={`${getEffectKey(effect)}-${index}`}>
               {describeEffect(effect)}
             </span>
           ))}
