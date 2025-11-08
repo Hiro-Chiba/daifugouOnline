@@ -10,11 +10,12 @@ interface PlayerListProps {
 }
 
 const PlayerList = ({ players, currentTurn }: PlayerListProps) => {
-  const count = players.length || 1;
-  const hasGameStarted = players.some((player) => player.handCount > 0);
+  const orderedPlayers = [...players].sort((a, b) => a.seat - b.seat);
+  const count = orderedPlayers.length || 1;
+  const hasGameStarted = orderedPlayers.some((player) => player.handCount > 0);
   return (
     <div className="player-circle">
-      {players.map((player, index) => {
+      {orderedPlayers.map((player, index) => {
         const isActive = currentTurn === player.id && !player.finished;
         const angle = (index / count) * 2 * Math.PI - Math.PI / 2;
         const radius = 42;
