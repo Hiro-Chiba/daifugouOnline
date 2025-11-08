@@ -29,6 +29,9 @@ export const parseState = (input: string | null | undefined, roomCode: string): 
       ...base.table,
       ...(parsed.table ?? {})
     };
+    if (typeof table.queenPurgeResult === 'undefined') {
+      table.queenPurgeResult = null;
+    }
     return {
       ...base,
       ...parsed,

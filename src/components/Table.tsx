@@ -2,7 +2,7 @@
 
 import Image from 'next/image';
 import { useEffect, useState } from 'react';
-import type { Card, PublicState, Suit, Effect, Play } from '@/lib/game/types';
+import type { Card, PublicState, Suit, Effect, Play, QueenPurgeResult } from '@/lib/game/types';
 import { getCardImagePath, getCardLabel } from '@/lib/game/cardAssets';
 
 const describeCards = (cards: Card[]): string => cards.map(getCardLabel).join(' ');
@@ -50,7 +50,13 @@ const Table = ({ state }: TableProps) => {
   const [plays, setPlays] = useState<{ current: Play | null; previous: Play | null }>(
     { current: null, previous: null }
   );
+  const [queenResult, setQueenResult] = useState<QueenPurgeResult | null>(null);
   const lastPlay = state?.table.lastPlay ?? null;
+  const latestQueenResult = state?.table.queenPurgeResult ?? null;
+  const queenPlayerId = latestQueenResult?.playerId ?? null;
+  const queenRank = latestQueenResult?.rank ?? null;
+  const queenCount = latestQueenResult?.count ?? null;
+  const queenTimestamp = latestQueenResult?.timestamp ?? null;
 
   useEffect(() => {
     setPlays((prev) => {
@@ -63,6 +69,24 @@ const Table = ({ state }: TableProps) => {
       return { current: lastPlay, previous: prev.current ?? prev.previous ?? null };
     });
   }, [lastPlay]);
+
+  useEffect(() => {
+    if (!queenPlayerId || !queenRank || queenTimestamp === null || queenCount === null) {
+      setQueenResult(null);
+      return;
+    }
+    const current: QueenPurgeResult = {
+      playerId: queenPlayerId,
+      rank: queenRank,
+      count: queenCount,
+      timestamp: queenTimestamp
+    };
+    setQueenResult(current);
+    const timer = window.setTimeout(() => {
+      setQueenResult((prev) => (prev && prev.timestamp === queenTimestamp ? null : prev));
+    }, 5000);
+    return () => window.clearTimeout(timer);
+  }, [queenPlayerId, queenRank, queenCount, queenTimestamp]);
 
   const currentPlay = plays.current;
   const previousPlay = plays.previous;
@@ -145,6 +169,15 @@ const Table = ({ state }: TableProps) => {
           <span className="table-alert">ジョーカー待ち：♠3のみ返せます</span>
         ) : null}
       </div>
+      {queenResult ? (
+        <div className="table-queen-banner" role="status">
+          <strong>Qボンバー</strong>
+          <span>
+            {getPlayerName(queenResult.playerId)}が「{queenResult.rank}」を宣言し、
+            {queenResult.count}枚のカードが捨てられました
+          </span>
+        </div>
+      ) : null}
       {state?.pendingEffects.length ? (
         <div className="table-effects">
           {state.pendingEffects.map((effect, index) => (
